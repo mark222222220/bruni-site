@@ -159,12 +159,14 @@
     if (ex) ex.qty = Math.min(ex.qty + 1, 9); else cart.push({ pid, ci, size, qty: 1 });
     saveCart();
     const b = $("#bagBadge"); b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump");
+    const bb = $("#bagBtn"); bb.classList.remove("wiggle"); void bb.offsetWidth; setTimeout(() => bb.classList.add("wiggle"), 650);
   }
   function toggleFav(pid) {
     const i = favs.indexOf(pid);
     if (i >= 0) favs.splice(i, 1); else favs.unshift(pid);
     saveFavs();
-    $$(`[data-fav="${pid}"]`).forEach((el) => el.classList.toggle("on", favs.includes(pid)));
+    $$(`[data-fav="${pid}"]`).forEach((el) => { el.classList.toggle("on", favs.includes(pid)); el.classList.remove("pop"); void el.offsetWidth; if (favs.includes(pid)) el.classList.add("pop"); });
+    const fb = $("#favBadge"); fb.classList.remove("bump"); void fb.offsetWidth; fb.classList.add("bump");
     return favs.includes(pid);
   }
   function updateBadges() {
@@ -214,6 +216,23 @@
     const cnt = $("#gallery .counter"); if (cnt) cnt.innerHTML = `<span id="gCur">1</span> / ${tr.children.length}`;
   };
 
+  /* Мягкий параллакс крупных фото */
+  let pxTick = false;
+  function parallax() {
+    if (pxTick || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    pxTick = true;
+    requestAnimationFrame(() => {
+      pxTick = false;
+      const vh = innerHeight;
+      $$("[data-px]").forEach((el) => {
+        const r = el.parentElement.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > vh) return;
+        const k = parseFloat(el.dataset.px) || 0.06;
+        el.style.transform = `translate3d(0, ${((r.top + r.height / 2 - vh / 2) * -k).toFixed(1)}px, 0) scale(1.14)`;
+      });
+    });
+  }
+
   /* Появление при скролле */
   let io;
   function observeReveal(root = document) {
@@ -245,7 +264,11 @@
   }
 
   /* Панели */
-  function openDrawer(id) { $("#" + id).classList.add("open"); document.body.classList.add("lock"); }
+  function openDrawer(id) {
+    const d = $("#" + id);
+    $$(".menu-list a, .menu-sub a, .f-group, .line-item", d).forEach((el, i) => { el.style.setProperty("--si", Math.min(i, 12)); el.classList.remove("stag"); void el.offsetWidth; el.classList.add("stag"); });
+    d.classList.add("open"); document.body.classList.add("lock");
+  }
   function closeDrawer(id) { $("#" + id).classList.remove("open"); if (!$(".drawer.open, .modal.open, .search-layer.open")) document.body.classList.remove("lock"); }
   function openModal(html) {
     const m = $("#modal"); $(".box-inner", m).innerHTML = html; m.classList.add("open"); document.body.classList.add("lock");
@@ -264,19 +287,27 @@
   }
   const go = (h) => { location.hash = h; };
 
-  let leaving = false;
+  let navId = 0, prevHash = null, restoreShown = 0;
+  const scrollMem = {};
   async function route() {
+    const id = ++navId;
+    if (prevHash != null && prevHash.startsWith("#/catalog") && catState) scrollMem[prevHash] = { y: scrollY, shown: catState.shown };
+    // переход между страницами: короткое затухание старой
+    const old = view.firstElementChild;
+    if (old && !old.classList.contains("page-out")) {
+      old.classList.add("page-out");
+      $("#topProgress")?.classList.add("run");
+      await new Promise((r) => setTimeout(r, 240));
+    }
+    if (id !== navId) return; // пользователь уже ушёл дальше
     const { parts, q } = parseHash();
     const [a, b] = parts;
-    // переход между страницами: короткое затухание старой
-    if (view.firstElementChild && !leaving) {
-      leaving = true;
-      view.firstElementChild.classList.add("page-out");
-      await new Promise((r) => setTimeout(r, 220));
-      leaving = false;
-    }
+    const fromProduct = (prevHash || "").startsWith("#/p/");
+    const mem = fromProduct ? scrollMem[location.hash] : null;
+    restoreShown = mem ? mem.shown : 0;
     closeDrawer("menu"); closeDrawer("bag"); closeDrawer("filters"); closeModal(); closeSearch();
     document.body.classList.remove("has-mobile-buy");
+    $("#lookCursor")?.classList.remove("on");
     $("#mobileBuy")?.remove();
     window.scrollTo(0, 0);
     let html;
@@ -295,6 +326,9 @@
     $$(".nav-desk a").forEach((l) => l.classList.toggle("active", l.getAttribute("href") === "#/" + (a || "") + (a === "catalog" && q.group ? "?group=" + q.group : "")));
     const after = AFTER[a || "home"]; if (after) after(parts, q);
     observeReveal(view);
+    if (mem) window.scrollTo(0, mem.y);
+    prevHash = location.hash;
+    $("#topProgress")?.classList.remove("run");
     document.title = (TITLES[a] ? TITLES[a] + " — " : "") + CFG.STORE_NAME;
   }
   const TITLES = { catalog: "Каталог", favorites: "Избранное", checkout: "Оформление заказа", pay: "Оплата", success: "Заказ оформлен", about: "О магазине", delivery: "Доставка и оплата", returns: "Возврат", contacts: "Контакты" };
@@ -333,7 +367,7 @@
       <div class="look ${idx % 2 ? "flip" : ""}">${items.map((p, i) => tile(p, i === 0)).join("")}</div>
       <div class="shop-look reveal">
         <span class="list">${items.length} вещи · ${Array.from(new Set(items.map((p) => p.brandName))).join(" + ")}</span>
-        <a class="link" href="#/catalog?ids=${encodeURIComponent(ids)}&title=${encodeURIComponent(ch.title)}">Купить образ</a>
+        <a class="link" href="#/catalog?ids=${encodeURIComponent(ids)}&title=${encodeURIComponent(ch.title.replace(/<[^>]*>/g, ""))}">Купить образ</a>
       </div>
     </section>`;
   }
@@ -378,6 +412,8 @@
     <nav class="chapters-nav" id="chNav">${CHAPTERS.map((c, i) => `<a href="#ch-${i}" data-scroll="ch-${i}">${c.num.split(" ")[0]} ${c.key}</a>`).join("")}</nav>
     ${chapters}
 
+    <div class="marquee" aria-hidden="true"><div class="marquee-track">${Array(4).fill(`<span>Zara</span><i>✳</i><span><em>Victoria's Secret</em></span><i>✳</i><span>Симферополь</span><i>✳</i><span><em>Доставка по Крыму</em></span><i>✳</i>`).join("")}</div></div>
+
     <section class="quote reveal"><blockquote>«Хороший гардероб — это когда снаружи и внутри одинаково красиво»</blockquote></section>
 
     <section class="split">
@@ -403,6 +439,20 @@
     </section>`;
   }
   AFTER.home = () => {
+    // параллакс включается после стартовой анимации героя
+    setTimeout(() => {
+      $$(".hero-media img, .look .lk.big img, .split img").forEach((im) => { im.style.animation = "none"; im.style.transition = "none"; im.dataset.px = im.closest(".hero") ? "0.1" : "0.05"; });
+      parallax();
+    }, 2700);
+    // курсор «Смотреть» на кадрах лукбука (компьютер)
+    if (matchMedia("(hover: hover)").matches) {
+      const cur = $("#lookCursor");
+      $$(".look .lk, .split a").forEach((el) => {
+        el.addEventListener("mouseenter", () => cur.classList.add("on"));
+        el.addEventListener("mouseleave", () => cur.classList.remove("on"));
+        el.addEventListener("mousemove", (e) => { cur.style.left = e.clientX + "px"; cur.style.top = e.clientY + "px"; });
+      });
+    }
     // подсветка активной главы
     const links = $$("#chNav a");
     const secs = $$(".chapter");
@@ -476,9 +526,9 @@
   function pageCatalog(q) {
     const f = readFilters(q);
     const list = sortList(applyFilters(f), f.sort);
-    catState = { f, list, shown: Math.min(PAGE_SIZE, list.length) };
+    catState = { f, list, shown: Math.min(Math.max(PAGE_SIZE, restoreShown), list.length) };
     let title = "Весь каталог", eyebrow = `${esc(CFG.STORE_NAME)} · Zara + Victoria's Secret`;
-    if (f.title) { title = f.title; eyebrow = "Образ из лукбука"; }
+    if (f.title) { title = esc(f.title.replace(/<[^>]*>/g, "")); eyebrow = "Образ из лукбука"; }
     else if (f.q) { title = `«${esc(f.q)}»`; eyebrow = "Поиск"; }
     else if (f.cat.length === 1) { title = esc(CATS[f.cat[0]]?.title || ""); eyebrow = CATS[f.cat[0]]?.groupTitle || ""; }
     else if (f.group) { title = esc(GROUPS[f.group] || ""); }
@@ -773,18 +823,31 @@
       const left = free ? Math.max(0, free - total) : 0;
       $("#bagFoot").innerHTML = `
         ${free ? `<div class="free-ship">${left ? `До бесплатной доставки по Симферополю — ${fmt(left)}` : "Доставка по Симферополю — бесплатно"}<div class="bar"><i style="width:${Math.min(100, (total / free) * 100)}%"></i></div></div>` : ""}
-        <div class="row total"><span>Итого</span><span>${fmt(total)}</span></div>
+        <div class="row total"><span>Итого</span><span data-count="${total}">${fmt(lastBagTotal)}</span></div>
         <a href="#/checkout" class="btn btn--block">Оформить заказ</a>
         <button class="btn btn--ghost btn--block" style="margin-top:8px" data-close="bag">Продолжить покупки</button>`;
-    }
+      countUp();
+    } else lastBagTotal = 0;
+  }
+  let lastBagTotal = 0;
+  function countUp() {
+    const el = $("#bagFoot [data-count]"); if (!el) return;
+    const to = +el.dataset.count, from = lastBagTotal, t0 = performance.now(), dur = 600;
+    lastBagTotal = to;
+    const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(Math.round((from + (to - from) * e) / 10) * 10); if (k < 1) requestAnimationFrame(step); else el.textContent = fmt(to); };
+    requestAnimationFrame(step);
   }
   function bagEvents() {
     $("#bagItems").addEventListener("click", (e) => {
       const li = e.target.closest(".line-item"); if (!li) return;
       const i = +li.dataset.i;
       const q = e.target.closest("[data-q]");
-      if (q) { cart[i].qty = Math.max(1, Math.min(9, cart[i].qty + +q.dataset.q)); saveCart(); renderBag(); }
-      if (e.target.closest("[data-rm]")) { li.classList.add("removing"); setTimeout(() => { cart.splice(i, 1); saveCart(); renderBag(); }, 380); }
+      if (q) {
+        cart[i].qty = Math.max(1, Math.min(9, cart[i].qty + +q.dataset.q)); saveCart(); renderBag();
+        $$("#bagItems .line-item").forEach((x) => (x.style.animation = "none"));
+        const sp = $(`#bagItems .line-item[data-i="${i}"] .qty span`); if (sp) sp.classList.add("flip");
+      }
+      if (e.target.closest("[data-rm]") && !li.classList.contains("removing")) { li.classList.add("removing"); setTimeout(() => { cart.splice(i, 1); saveCart(); renderBag(); }, 380); }
     });
   }
 
@@ -1139,7 +1202,7 @@
           <a href="#/catalog">Каталог</a><a href="#/catalog?group=clothes">Одежда</a><a href="#/catalog?group=lingerie">Бельё</a><a href="#/catalog?group=sleep">Пижамы</a><a href="#/catalog?group=beauty">Красота</a>
         </nav>
       </div>
-      <a href="#/" class="logo">${N}</a>
+      <a href="#/" class="logo" aria-label="${N}">${Array.from(CFG.STORE_NAME).map((ch, i) => `<span style="--i:${i}">${esc(ch)}</span>`).join("")}</a>
       <div class="right">
         <button class="icon-btn" id="searchBtn" aria-label="Поиск">${I.search}</button>
         <a class="icon-btn" href="#/favorites" aria-label="Избранное">${I.heart}<span class="badge" id="favBadge"></span></a>
@@ -1190,6 +1253,9 @@
       <div class="msg">Связываемся с банком</div><div class="sub">Не закрывайте страницу</div>
     </div></div>
     <div class="toast" id="toast"></div>
+    <div class="top-progress" id="topProgress"></div>
+    <div class="scroll-bar" id="scrollBar"></div>
+    <div class="look-cursor" id="lookCursor">Смотреть</div>
     <button class="back-top" id="backTop" aria-label="Наверх">${I.up}</button>`;
     view = $("#view");
   }
@@ -1234,8 +1300,12 @@
     window.addEventListener("scroll", () => {
       const y = scrollY, h = $("#header");
       h.classList.toggle("scrolled", y > 10);
-      h.classList.toggle("hide", y > 400 && y > lastY + 4 && !document.body.classList.contains("lock"));
-      if (y < lastY - 4) h.classList.remove("hide");
+      if (y > 400 && y > lastY + 4 && !document.body.classList.contains("lock")) h.classList.add("hide");
+      if (y < lastY - 4 || y < 400) h.classList.remove("hide");
+      document.body.classList.toggle("hdr-hidden", h.classList.contains("hide"));
+      const max = document.documentElement.scrollHeight - innerHeight;
+      $("#scrollBar").style.transform = `scaleX(${max > 0 ? Math.min(1, y / max) : 0})`;
+      parallax();
       $("#backTop").classList.toggle("show", y > 1400);
       lastY = y;
     }, { passive: true });
