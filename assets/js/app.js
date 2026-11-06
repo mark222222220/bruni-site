@@ -48,14 +48,14 @@
     // На сервере (http/https) берём JSON напрямую; при открытии файла — data/catalog.js
     if (location.protocol.startsWith("http")) {
       try {
-        const r = await fetch("data/catalog.json?v=3", { cache: "no-cache" });
+        const r = await fetch("data/catalog.json?v=4", { cache: "no-cache" });
         if (r.ok) return await r.json();
       } catch (e) { /* упадём на запасной вариант */ }
     }
     if (window.CATALOG_DATA) return window.CATALOG_DATA;
     await new Promise((res, rej) => {
       const s = document.createElement("script");
-      s.src = "data/catalog.js?v=3"; s.onload = res; s.onerror = rej;
+      s.src = "data/catalog.js?v=4"; s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
     return window.CATALOG_DATA;
