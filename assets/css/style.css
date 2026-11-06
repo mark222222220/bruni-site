@@ -763,3 +763,8 @@ body.hdr-hidden .chapters-nav, body.hdr-hidden .toolbar { top: 0; }
 @media (prefers-reduced-motion: reduce) {
   .logo span, .stag, .marquee-track, .card.reveal .ph, .gallery .slide img { animation: none !important; opacity: 1 !important; transform: none !important; clip-path: none !important; }
 }
+
+/* Полоса глав лукбука: липнет только пока читаются главы, ровно к верху экрана */
+.chapters-wrap { position: relative; }
+.chapters-nav a { padding: 12px 16px; }
+@media (max-width: 767px) { .chapters-nav { background: rgba(245,242,237,.96); } }

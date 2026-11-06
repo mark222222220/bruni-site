@@ -48,14 +48,14 @@
     // На сервере (http/https) берём JSON напрямую; при открытии файла — data/catalog.js
     if (location.protocol.startsWith("http")) {
       try {
-        const r = await fetch("data/catalog.json", { cache: "no-cache" });
+        const r = await fetch("data/catalog.json?v=3", { cache: "no-cache" });
         if (r.ok) return await r.json();
       } catch (e) { /* упадём на запасной вариант */ }
     }
     if (window.CATALOG_DATA) return window.CATALOG_DATA;
     await new Promise((res, rej) => {
       const s = document.createElement("script");
-      s.src = "data/catalog.js"; s.onload = res; s.onerror = rej;
+      s.src = "data/catalog.js?v=3"; s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
     return window.CATALOG_DATA;
@@ -409,8 +409,10 @@
       <p>Мы собрали один день из&nbsp;вещей двух брендов: <em>Zara</em> — для&nbsp;улицы и&nbsp;вечера, <em>Victoria's&nbsp;Secret</em> — для&nbsp;всего, что под&nbsp;ними. Четыре главы, четыре настроения.</p>
     </section>
 
-    <nav class="chapters-nav" id="chNav">${CHAPTERS.map((c, i) => `<a href="#ch-${i}" data-scroll="ch-${i}">${c.num.split(" ")[0]} ${c.key}</a>`).join("")}</nav>
-    ${chapters}
+    <div class="chapters-wrap">
+      <nav class="chapters-nav" id="chNav">${CHAPTERS.map((c, i) => `<a href="#ch-${i}" data-scroll="ch-${i}">${c.num.split(" ")[0]} ${c.key}</a>`).join("")}</nav>
+      ${chapters}
+    </div>
 
     <div class="marquee" aria-hidden="true"><div class="marquee-track">${Array(4).fill(`<span>Zara</span><i>✳</i><span><em>Victoria's Secret</em></span><i>✳</i><span>Симферополь</span><i>✳</i><span><em>Доставка по Крыму</em></span><i>✳</i>`).join("")}</div></div>
 
