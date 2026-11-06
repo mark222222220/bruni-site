@@ -1,0 +1,78 @@
+# Интернет-магазин: Zara + Victoria's Secret (Симферополь)
+
+Открыть сайт: **двойной клик по `index.html`**. Ничего устанавливать не нужно.
+Для шрифтов и части фото в галерее нужен интернет; основные фото каталога лежат в папке `img/`.
+
+## Что где менять
+
+| Что | Где |
+|---|---|
+| Название магазина | `assets/js/config.js` → `STORE_NAME` |
+| Наценка, % | `assets/js/config.js` → `MARKUP_PERCENT` |
+| Курс доллара | `assets/js/config.js` → `USD_RUB` (`null` — курс ЦБ на дату сбора, он записан в `data/catalog.json` → `meta.usdRub`) |
+| Телефон, адрес, часы работы | `assets/js/config.js` |
+| Способы и цены доставки | `assets/js/config.js` → `DELIVERY` |
+| Каталог | `data/catalog.json` |
+| Подключение эквайринга | `assets/js/payment.js` → `PaymentGateway.charge()` |
+| Отправка заказа в CRM/Telegram | `assets/js/app.js` → функция `finishOrder()` (комментарий «МЕСТО ДЛЯ ОТПРАВКИ ЗАКАЗА») |
+
+## Каталог
+
+Каталог хранится в `data/catalog.json`. Цены там в долларах (`priceUsd`), как на сайтах брендов.
+Сайт сам считает рубли: `priceUsd × курс × (1 + наценка/100)` и округляет вверх до 10 ₽.
+
+Браузер не даёт странице читать JSON-файлы с диска, поэтому рядом лежит `data/catalog.js` —
+та же информация в виде скрипта. **После ручной правки `catalog.json` запустите**
+`python3 tools/json_to_js.py`: скрипт обновит `catalog.js`.
+Когда сайт будет на хостинге (http/https), он читает `catalog.json` напрямую.
+
+Один товар в JSON:
+
+```json
+{
+  "id": "z-595629171", "brand": "zara", "brandName": "Zara", "name": "Animal print tulle maxi dress",
+  "category": "dresses", "priceUsd": 59.9, "oldPriceUsd": null, "isNew": true,
+  "description": "…", "composition": "…", "sizeChart": "zara-alpha",
+  "colors": [{ "name": "Леопард", "family": "print", "images": ["img/z/….webp", "https://static.zara.net/…"],
+               "sizes": [{ "n": "S", "a": true }, { "n": "M", "a": false }] }]
+}
+```
+
+`a: false` — размера нет в наличии (кнопка зачёркнута).
+
+### Полное обновление с сайтов брендов
+
+```
+cd <пустая папка для сырых данных>
+python3 <сайт>/tools/zara_scrape.py
+python3 <сайт>/tools/vs_scrape_categories.py
+python3 <сайт>/tools/vs_scrape_products.py
+python3 <сайт>/tools/build_catalog.py .      # нужен Pillow: pip install pillow
+```
+
+Скрипты делают паузы между запросами. Сайты брендов могут поменять формат страниц —
+тогда скрипты придётся поправить.
+
+## Оплата
+
+Форма оплаты картой работает в демо-режиме: данные карты не отправляются и не сохраняются
+(ни на сервер, ни в localStorage/cookies). Карта, номер которой оканчивается на `0000`, имитирует отказ банка.
+Тестовая карта для проверки успешной оплаты: `2200 0000 0000 0004` (МИР, проходит проверку Луна), любой будущий срок, любой CVC.
+
+Инструкция по подключению настоящего эквайринга (ЮKassa, CloudPayments, Т-Банк) —
+в комментарии в начале `assets/js/payment.js`. Номер карты не должен попадать на ваш сервер:
+используйте токенизацию банка.
+
+## Структура
+
+```
+index.html            — точка входа
+assets/css/style.css  — дизайн
+assets/js/config.js   — настройки
+assets/js/app.js      — приложение (главная, каталог, фильтры, товар, корзина, оформление)
+assets/js/payment.js  — оплата
+data/catalog.json     — каталог (источник)
+data/catalog.js       — копия каталога для открытия без сервера
+img/                  — фото товаров (WebP)
+tools/                — скрипты обновления каталога
+```
