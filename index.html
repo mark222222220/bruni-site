@@ -1,1 +1,100 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZARA × Victoria's Secret — Евпатория</title>
+  <meta name="description" content="Женская одежда ZARA и бельё, пижамы и ароматы Victoria's Secret в Евпатории. Интернет-магазин с доставкой по городу и самовывозом.">
+  <meta name="theme-color" content="#f6f3ee">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111'/%3E%3Ctext x='16' y='22' font-family='serif' font-size='16' fill='%23f2b5c4' text-anchor='middle'%3EZ%C3%97V%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topbar"><div class="marquee"><span id="ticker"></span></div></div>
 
+  <header class="header" id="header">
+    <button class="icon-btn burger" id="burger" aria-label="Меню"><span></span><span></span></button>
+    <nav class="nav" id="nav">
+      <a href="#/catalog?brand=zara" data-brand="zara">ZARA</a>
+      <a href="#/catalog?brand=vs" data-brand="vs">Victoria's Secret</a>
+      <a href="#/catalog?tag=new">Новинки</a>
+      <a href="#/catalog?tag=sale">Sale</a>
+      <a href="#/contacts">Магазин</a>
+    </nav>
+    <a href="#/" class="logo" aria-label="На главную"><b>ZARA</b><i>×</i><em>Victoria's Secret</em></a>
+    <div class="actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Поиск">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      </button>
+      <a class="icon-btn" href="#/fav" aria-label="Избранное">
+        <svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg>
+        <span class="badge" id="favCount"></span>
+      </a>
+      <button class="icon-btn" id="cartBtn" aria-label="Корзина">
+        <svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+        <span class="badge" id="cartCount"></span>
+      </button>
+    </div>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="footer-grid">
+      <div>
+        <div class="logo logo--footer"><b>ZARA</b><i>×</i><em>Victoria's Secret</em></div>
+        <p class="muted" id="footAddr"></p>
+        <p class="muted" id="footHours"></p>
+      </div>
+      <div>
+        <h4>Покупателям</h4>
+        <a href="#/delivery">Доставка и оплата</a>
+        <a href="#/delivery">Обмен и возврат</a>
+        <a href="#/sizes">Таблица размеров</a>
+      </div>
+      <div>
+        <h4>Каталог</h4>
+        <a href="#/catalog?brand=zara">ZARA · женское</a>
+        <a href="#/catalog?brand=vs">Victoria's Secret</a>
+        <a href="#/catalog?brand=vs&cat=beauty">Ароматы</a>
+      </div>
+      <div>
+        <h4>Связь</h4>
+        <a id="footPhone" href="#"></a>
+        <a href="#/contacts">Адрес и карта</a>
+      </div>
+    </div>
+    <p class="fine">© <span id="year"></span> · Магазин в Евпатории. ZARA и Victoria's Secret — товарные знаки их правообладателей.</p>
+  </footer>
+
+  <!-- Корзина -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer" aria-label="Корзина">
+    <div class="drawer-head">
+      <h3>Корзина</h3>
+      <button class="icon-btn" data-close aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="drawer-body" id="cartBody"></div>
+    <div class="drawer-foot" id="cartFoot"></div>
+  </aside>
+
+  <!-- Поиск -->
+  <div class="search" id="search">
+    <div class="search-inner">
+      <input id="searchInput" type="search" placeholder="Что вы ищете? Пальто, пижама, Bombshell…" autocomplete="off">
+      <button class="icon-btn" data-close-search aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/products.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
