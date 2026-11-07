@@ -1,7 +1,7 @@
 import { Rubik_400Regular, Rubik_600SemiBold, Rubik_700Bold, Rubik_800ExtraBold, useFonts } from '@expo-google-fonts/rubik';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Onboarding } from '@/components/Onboarding';
 import { DataProvider } from '@/lib/data';
@@ -38,7 +38,9 @@ function Root() {
 }
 
 export default function Layout() {
-  const [fonts] = useFonts({ Rubik_400Regular, Rubik_600SemiBold, Rubik_700Bold, Rubik_800ExtraBold });
+  const [loaded, error] = useFonts({ Rubik_400Regular, Rubik_600SemiBold, Rubik_700Bold, Rubik_800ExtraBold });
+  // в веб-сборке одним файлом шрифты встроены в страницу; если загрузка не удалась — показываем системный шрифт
+  const fonts = loaded || !!error || Platform.OS === 'web';
   return (
     <SafeAreaProvider>
       <SettingsProvider>{fonts ? <Root /> : <View style={{ flex: 1, backgroundColor: '#08080C' }} />}</SettingsProvider>

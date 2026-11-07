@@ -11,7 +11,9 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "ru.glasshouse.avp",
-      "infoPlist": { "ITSAppUsesNonExemptEncryption": false }
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "ru.glasshouse.avp",
@@ -22,8 +24,21 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
-    "web": { "favicon": "./assets/favicon.png", "output": "single" },
-    "plugins": ["expo-router", "expo-font"],
-    "experiments": { "typedRoutes": false }
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "output": "single"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "asyncRoutes": false
+        }
+      ],
+      "expo-font"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
   }
 }
