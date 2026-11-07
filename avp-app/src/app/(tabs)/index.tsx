@@ -1,137 +1,203 @@
 import { Redirect, router } from 'expo-router';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Bar, Card, Glass, Icon, Screen, Section, T, styles, Banner } from '@/components/ui';
-import { useData, useDerived, statusIndex } from '@/lib/data';
-import { fmt, greeting, money, shortDate, tomorrow, dm } from '@/lib/format';
-import { useSettings } from '@/lib/settings';
+import { Appear, Banner, Card, CountUp, HeroCard, IconBadge, Press, Ring, Screen, Section, Spark, T, styles } from '@/components/ui';
+import { statusIndex, useData, useDerived } from '@/lib/data';
+import { CASH_HISTORY } from '@/lib/demo';
+import { dm, fmt, greeting, money, shortDate, tomorrow } from '@/lib/format';
 import { pathFor, SECTION_PATH } from '@/lib/nav';
+import { useSettings } from '@/lib/settings';
 import { ROLE_SECTIONS, STATUSES, type Section as Sec } from '@/lib/types';
 
 export default function Home() {
   const { s, t } = useSettings();
   const { kind, loading, error } = useData();
   const d = useDerived();
+  const [heroW, setHeroW] = useState(0);
   const sections = ROLE_SECTIONS[s.role];
   if (!sections.includes('index')) return <Redirect href={SECTION_PATH[sections[0]] as '/'} />;
   const can = (x: Sec) => sections.includes(x);
   const go = (x: Sec) => router.navigate(pathFor(x, s.role) as '/');
   const ok = d.balance >= d.due;
-  const counts = STATUSES.slice(0, 4).map((st) => d.active.filter((o) => statusIndex(o.status) === STATUSES.indexOf(st)).length);
-  const total = counts.reduce((a, b) => a + b, 0) || 1;
-  const shades = [t.accent + '66', t.accent + 'AA', t.accent, t.ok];
+  const area = d.active.reduce((a, o) => a + o.area, 0);
+  const stages = STATUSES.slice(0, 4).map((st, k) => {
+    const list = d.active.filter((o) => statusIndex(o.status) === k);
+    return { ...st, n: list.length, m2: list.reduce((a, o) => a + o.area, 0) };
+  });
+  const maxM2 = Math.max(1, ...stages.map((x) => x.m2));
   const quick = [
-    { sec: 'orders' as Sec, label: 'Новый заказ', icon: 'plus', on: () => (s.role === 'boss' || s.role === 'sales' ? router.push('/new-order') : go('orders')) },
+    { sec: 'orders' as Sec, label: 'Заказ', icon: 'plus', on: () => (s.role === 'boss' || s.role === 'sales' ? router.push('/new-order') : go('orders')) },
     { sec: 'stock' as Sec, label: 'Остатки', icon: 'box', on: () => go('stock') },
     { sec: 'money' as Sec, label: 'Платежи', icon: 'money', on: () => go('money') },
-    { sec: 'chat' as Sec, label: 'Написать', icon: 'chat', on: () => go('chat') },
+    { sec: 'chat' as Sec, label: 'Чат', icon: 'chat', on: () => go('chat') },
   ].filter((q) => can(q.sec));
+  let i = 0;
 
   return (
-    <Screen title={greeting() + (s.name ? `, ${s.name.split(' ')[0]}` : '')} subtitle={shortDate() + (kind === 'local' ? ' · демо-режим' : '')}>
+    <Screen kicker={`${shortDate()}${kind === 'local' ? ' · демо' : ''}`} title={greeting() + (s.name ? `,\n${s.name.split(' ')[0]}` : '')}>
       {error ? <Banner tone="bad" text={`Нет связи с базой: ${error}`} /> : loading ? <Banner text="Загружаю данные…" /> : null}
-      {can('money') ? (
-          <Card onPress={() => go('money')}>
-            <T v="label">Деньги на счёте · пример</T>
-            <T v="big" style={{ color: ok ? t.ok : t.bad }}>
-              {fmt(d.balance / 1e6, 1)} <T v="h">млн</T>
-            </T>
-            <T v="small">
-              к оплате ≈ {money(d.due)} ₽ — {ok ? 'хватает' : 'не хватает'}
-            </T>
-          </Card>
-        ) : null}
-      <View style={{ flexDirection: 'row', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Card onPress={can('margin') ? () => go('margin') : undefined}>
-            <T v="label">Маржа</T>
-            <T v="big" style={{ color: d.avgMargin < s.thr ? t.bad : t.fg }}>
-              {fmt(d.avgMargin)}
-              <T v="h">%</T>
-            </T>
-            <Bar value={d.avgMargin * 2} />
-            <T v="small">средняя по клиентам</T>
-          </Card>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Card onPress={() => go('orders')}>
-            <T v="label">Отгрузки завтра</T>
-            <T v="big">{d.shipTomorrow.length}</T>
-            <T v="small">
-              {fmt(d.shipTomorrow.reduce((a, o) => a + o.area, 0), 1)} м² · {dm(tomorrow())}
-            </T>
-          </Card>
-        </View>
-      </View>
 
-      {quick.length ? (
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          {quick.map((q) => (
-            <Pressable key={q.label} onPress={q.on} style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.7 : 1 })} accessibilityRole="button">
-              <Glass style={{ alignItems: 'center', paddingVertical: 12, gap: 6 }} radius={18} interactive>
-                <Icon name={q.icon} color={t.accent} size={24} />
-                <T v="small" style={{ color: t.fg, fontSize: 12, textAlign: 'center' }} numberOfLines={2}>
-                  {q.label}
+      {can('money') ? (
+        <Appear i={i++}>
+          <HeroCard onPress={() => go('money')}>
+            <View style={[styles.row, { justifyContent: 'space-between' }]}>
+              <T v="label" style={{ color: 'rgba(17,17,19,0.7)' }}>
+                Деньги на счёте
+              </T>
+              <View style={{ backgroundColor: 'rgba(17,17,19,0.14)', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 }}>
+                <T v="b" style={{ fontSize: 11, color: '#111113' }}>
+                  пример
                 </T>
-              </Glass>
-            </Pressable>
-          ))}
-        </View>
+              </View>
+            </View>
+            <View style={[styles.row, { alignItems: 'flex-end', gap: 8 }]}>
+              <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, 1)} style={{ color: '#111113' }} />
+              <T v="h" style={{ color: '#111113', marginBottom: 8 }}>
+                млн ₽
+              </T>
+            </View>
+            <View onLayout={(e) => setHeroW(e.nativeEvent.layout.width)} style={{ marginTop: 4 }}>
+              <Spark data={CASH_HISTORY} width={heroW} height={58} color="#111113" />
+            </View>
+            <View style={[styles.row, { justifyContent: 'space-between', marginTop: 2 }]}>
+              <T v="small" style={{ color: 'rgba(17,17,19,0.75)' }}>
+                к оплате ≈ {money(d.due)} ₽
+              </T>
+              <View style={{ backgroundColor: '#111113', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 5 }}>
+                <T v="b" style={{ fontSize: 12, color: ok ? t.accent2 : '#FF6B5E' }}>
+                  {ok ? 'хватает на 2 недели' : `не хватает ${money(d.due - d.balance)}`}
+                </T>
+              </View>
+            </View>
+          </HeroCard>
+        </Appear>
       ) : null}
 
-      <Section>Производство</Section>
-      <Card onPress={() => go('orders')}>
-        <View style={[styles.row, { justifyContent: 'space-between' }]}>
-          <T v="b">{d.active.length} заказов в работе</T>
-          <T v="small">{fmt(d.active.reduce((a, o) => a + o.area, 0), 1)} м²</T>
+      <Appear i={i++}>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Card onPress={can('margin') ? () => go('margin') : undefined} style={{ minHeight: 210 }}>
+              <T v="label">Маржа</T>
+              <View style={{ alignSelf: 'center', marginTop: 6 }}>
+                <Ring value={d.avgMargin / 50} size={108} stroke={10} color={d.avgMargin < s.thr ? t.bad : undefined}>
+                  <CountUp v="num" value={d.avgMargin} format={(n) => `${fmt(n)}%`} style={{ fontSize: 24 }} />
+                </Ring>
+              </View>
+              <T v="small" style={{ alignSelf: 'center' }}>
+                средняя · порог {s.thr}%
+              </T>
+            </Card>
+          </View>
+          <View style={{ flex: 1, gap: 12 }}>
+            <Card onPress={() => go('orders')} style={{ flex: 1 }}>
+              <T v="label">Отгрузки завтра</T>
+              <CountUp value={d.shipTomorrow.length} format={(n) => fmt(n)} />
+              <T v="small">
+                {fmt(d.shipTomorrow.reduce((a, o) => a + o.area, 0), 1)} м² · {dm(tomorrow())}
+              </T>
+            </Card>
+            <Card onPress={() => go('orders')} tone={d.overdue.length ? 'bad' : undefined} style={{ flex: 1 }}>
+              <T v="label">В работе</T>
+              <View style={[styles.row, { alignItems: 'flex-end', gap: 6 }]}>
+                <CountUp value={d.active.length} format={(n) => fmt(n)} />
+                <T v="small" style={{ marginBottom: 6 }}>
+                  заказов
+                </T>
+              </View>
+              <T v="small" style={d.overdue.length ? { color: t.bad } : undefined}>
+                {d.overdue.length ? `${d.overdue.length} просрочен` : `${fmt(area, 0)} м² в цеху`}
+              </T>
+            </Card>
+          </View>
         </View>
-        <View style={{ flexDirection: 'row', height: 32, borderRadius: 12, overflow: 'hidden', gap: 2, marginTop: 4 }}>
-          {counts.some(Boolean) ? (
-            counts.map((n, i) =>
-              n ? (
-                <View key={i} style={{ flex: n / total, backgroundColor: shades[i], alignItems: 'center', justifyContent: 'center', minWidth: 28 }}>
-                  <T v="b" style={{ color: t.onAccent, fontSize: 13 }}>
-                    {n}
+      </Appear>
+
+      {quick.length ? (
+        <Appear i={i++}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8 }}>
+            {quick.map((q) => (
+              <Press key={q.label} onPress={q.on} label={q.label}>
+                <View style={{ alignItems: 'center', gap: 8, width: 72 }}>
+                  <View style={{ width: 60, height: 60, borderRadius: 30, borderWidth: 1.5, borderColor: t.accent + 'AA', backgroundColor: t.accent + '12', alignItems: 'center', justifyContent: 'center' }}>
+                    <IconBadge icon={q.icon} size={46} />
+                  </View>
+                  <T v="small" style={{ color: t.fg, fontSize: 12 }}>
+                    {q.label}
                   </T>
                 </View>
-              ) : null,
-            )
-          ) : (
-            <View style={{ flex: 1, backgroundColor: t.card2, alignItems: 'center', justifyContent: 'center' }}>
-              <T v="small">нет заказов</T>
-            </View>
-          )}
-        </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
-          {STATUSES.slice(0, 4).map((st, i) => (
-            <View key={st.id} style={[styles.row, { gap: 6 }]}>
-              <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: shades[i] }} />
-              <T v="small">{st.name}</T>
+              </Press>
+            ))}
+          </View>
+        </Appear>
+      ) : null}
+
+      <Section right={<T v="small">{fmt(area, 1)} м²</T>}>Производство</Section>
+      <Appear i={i++}>
+        <Card onPress={() => go('orders')} style={{ gap: 14 }}>
+          {stages.map((st, k) => (
+            <View key={st.id} style={{ gap: 7 }}>
+              <View style={[styles.row, { justifyContent: 'space-between' }]}>
+                <View style={[styles.row, { gap: 9 }]}>
+                  <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: k === 3 ? t.okBg : t.accent + '22', alignItems: 'center', justifyContent: 'center' }}>
+                    <T v="b" style={{ fontSize: 11, color: k === 3 ? t.ok : t.accent }}>
+                      {k + 1}
+                    </T>
+                  </View>
+                  <T v="b">{st.name}</T>
+                </View>
+                <T v="small">
+                  <T v="b" style={{ fontSize: 13 }}>
+                    {st.n}
+                  </T>
+                  {` · ${fmt(st.m2, 1)} м²`}
+                </T>
+              </View>
+              <View style={{ height: 8, borderRadius: 4, backgroundColor: t.card2, overflow: 'hidden' }}>
+                <View style={{ width: `${(st.m2 / maxM2) * 100}%`, height: '100%', borderRadius: 4, backgroundColor: k === 3 ? t.ok : t.accent, opacity: 0.5 + k * 0.17 }} />
+              </View>
             </View>
           ))}
-        </View>
-      </Card>
+        </Card>
+      </Appear>
 
-      <Section>{`Сигналы · ${d.signals.length}`}</Section>
+      <Section
+        right={
+          d.signals.length ? (
+            <View style={{ backgroundColor: t.bad, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+              <T v="b" style={{ color: '#fff', fontSize: 12 }}>
+                {d.signals.length}
+              </T>
+            </View>
+          ) : undefined
+        }
+      >
+        Сигналы
+      </Section>
       {d.signals.length ? (
         d.signals.map((x) => (
-          <Glass key={x.id} style={{ padding: 14, flexDirection: 'row', gap: 12, alignItems: 'flex-start', backgroundColor: x.level === 'bad' ? t.badBg : t.warnBg }} radius={18}>
-            <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: x.level === 'bad' ? t.bad : t.warn, marginTop: 6 }} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <T v="body">{x.title}</T>
-              <T v="small">{x.detail}</T>
-            </View>
-            {can('chat') ? (
-              <Pressable
-                onPress={() => router.navigate({ pathname: '/chat', params: { ch: x.channel, q: x.title } })}
-                style={{ backgroundColor: t.card2, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}
-                accessibilityRole="button"
-              >
-                <T v="b" style={{ fontSize: 12 }}>
-                  Обсудить
+          <Appear key={x.id} i={i++}>
+            <Card tone={x.level === 'bad' ? 'bad' : 'warn'} style={{ flexDirection: 'row', gap: 12, alignItems: 'center', paddingVertical: 15 }}>
+              <IconBadge icon={x.channel === 'stock' ? 'stock' : x.channel === 'money' ? 'money' : x.id.startsWith('o') ? 'truck' : 'margin'} tone={x.level} size={42} />
+              <View style={{ flex: 1, gap: 3 }}>
+                <T v="b" style={{ fontSize: 14 }}>
+                  {x.title}
                 </T>
-              </Pressable>
-            ) : null}
-          </Glass>
+                <T v="small">{x.detail}</T>
+              </View>
+              {can('chat') ? (
+                <Pressable
+                  onPress={() => router.navigate({ pathname: '/chat', params: { ch: x.channel, q: x.title } })}
+                  style={{ borderWidth: 1.5, borderColor: t.line, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Обсудить: ${x.title}`}
+                >
+                  <T v="b" style={{ fontSize: 12 }}>
+                    Обсудить
+                  </T>
+                </Pressable>
+              ) : null}
+            </Card>
+          </Appear>
         ))
       ) : (
         <Card>

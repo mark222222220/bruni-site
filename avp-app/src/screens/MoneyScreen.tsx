@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
-import { Bar, Button, Card, Empty, Item, List, Pill, Screen, T, styles } from '@/components/ui';
+import { Appear, Button, Card, CountUp, Empty, Pill, Screen, T, styles } from '@/components/ui';
 import { useData, useDerived } from '@/lib/data';
 import { dm, fmt, money, today } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
@@ -11,63 +11,102 @@ export function MoneyScreen({ back }: { back?: boolean }) {
   const { t, tap } = useSettings();
   const ok = d.balance >= d.due;
   const T0 = today();
+  const paid = snap.payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0);
   const list = snap.payments.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const days = [...new Set(list.map((p) => p.date))];
+  const scale = Math.max(d.balance, d.due + paid) || 1;
+  let i = 0;
 
   return (
-    <Screen title="Деньги" subtitle="Платежи и остаток" back={back}>
-      <Card>
-        <T v="label">На счёте · пример</T>
-        <T v="big">
-          {fmt(d.balance / 1e6, 1)} <T v="h">млн</T>
-        </T>
-        <Bar value={(d.due / d.balance) * 100} color={ok ? t.accent : t.bad} height={10} />
-        <View style={[styles.row, { justifyContent: 'space-between' }]}>
-          <T v="small">к оплате ≈ {money(d.due)} ₽</T>
-          <T v="small" style={{ color: ok ? t.ok : t.bad }}>
-            {ok ? 'хватает' : `не хватает ${money(d.due - d.balance)} ₽`}
+    <Screen kicker="Деньги" title="Платёжный календарь" back={back}>
+      <Appear i={i++}>
+        <Card tone={ok ? 'accent' : 'bad'} style={{ gap: 12 }}>
+          <View style={[styles.row, { justifyContent: 'space-between' }]}>
+            <T v="label">На счёте</T>
+            <Pill text="пример" />
+          </View>
+          <View style={[styles.row, { alignItems: 'flex-end', gap: 8 }]}>
+            <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, 1)} />
+            <T v="h" style={{ marginBottom: 8, color: t.dim }}>
+              млн ₽
+            </T>
+          </View>
+          <View style={{ height: 14, borderRadius: 7, backgroundColor: t.card2, flexDirection: 'row', overflow: 'hidden' }}>
+            <View style={{ width: `${(paid / scale) * 100}%`, backgroundColor: t.ok, opacity: 0.8 }} />
+            <View style={{ width: `${(d.due / scale) * 100}%`, backgroundColor: ok ? t.accent : t.bad }} />
+          </View>
+          <View style={[styles.row, { justifyContent: 'space-between' }]}>
+            <View style={[styles.row, { gap: 6 }]}>
+              <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: t.ok }} />
+              <T v="small">оплачено {money(paid)}</T>
+            </View>
+            <View style={[styles.row, { gap: 6 }]}>
+              <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: ok ? t.accent : t.bad }} />
+              <T v="small">к оплате {money(d.due)}</T>
+            </View>
+          </View>
+          <T v="b" style={{ color: ok ? t.ok : t.bad }}>
+            {ok ? `Хватает: после платежей останется ${money(d.balance - d.due)} ₽` : `Не хватает ${money(d.due - d.balance)} ₽`}
           </T>
-        </View>
-      </Card>
-      <List>
-        {list.length ? (
-          list.map((p, i) => {
-            const late = !p.paid && p.date < T0;
-            return (
-              <Item
-                key={p.id}
-                first={i === 0}
-                title={p.title}
-                sub={
-                  <T v="small" style={late ? { color: t.bad } : undefined}>
-                    {dm(p.date)} · {money(p.amount)} ₽
-                  </T>
-                }
-                right={
-                  <Pressable
-                    onPress={() => {
-                      tap(p.paid ? 'light' : 'success');
-                      patch('payments', p.id, { paid: !p.paid });
-                    }}
-                    accessibilityRole="switch"
-                    accessibilityState={{ checked: p.paid }}
-                    accessibilityLabel={`Оплата: ${p.title}`}
-                    hitSlop={6}
-                  >
-                    <Pill text={p.paid ? '✓ оплачено' : late ? 'просрочен' : 'ожидается'} tone={p.paid ? 'ok' : late ? 'bad' : 'neutral'} />
-                  </Pressable>
-                }
-              />
-            );
-          })
-        ) : (
+        </Card>
+      </Appear>
+
+      {days.length ? (
+        days.map((day) => (
+          <Appear key={day} i={i++}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ width: 52, alignItems: 'center', paddingTop: 16 }}>
+                <T v="big" style={{ fontSize: 24, color: day < T0 ? t.bad : t.fg }}>
+                  {day.slice(8, 10)}
+                </T>
+                <T v="label" style={{ fontSize: 10 }}>
+                  {new Date(day + 'T12:00:00').toLocaleDateString('ru-RU', { month: 'short' }).replace('.', '')}
+                </T>
+              </View>
+              <View style={{ flex: 1, gap: 8 }}>
+                {list
+                  .filter((p) => p.date === day)
+                  .map((p) => {
+                    const late = !p.paid && p.date < T0;
+                    return (
+                      <Card key={p.id} tone={late ? 'bad' : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14 }}>
+                        <View style={{ flex: 1, gap: 3 }}>
+                          <T v="b" style={{ fontSize: 14, opacity: p.paid ? 0.6 : 1 }}>
+                            {p.title}
+                          </T>
+                          <T v="num" style={{ fontSize: 16, opacity: p.paid ? 0.6 : 1 }}>
+                            {fmt(p.amount)} ₽
+                          </T>
+                        </View>
+                        <Pressable
+                          onPress={() => {
+                            tap(p.paid ? 'light' : 'success');
+                            patch('payments', p.id, { paid: !p.paid });
+                          }}
+                          accessibilityRole="switch"
+                          accessibilityState={{ checked: p.paid }}
+                          accessibilityLabel={`Оплата: ${p.title}`}
+                          hitSlop={8}
+                        >
+                          <Pill text={p.paid ? '✓ оплачено' : late ? 'просрочен' : 'ожидается'} tone={p.paid ? 'ok' : late ? 'bad' : 'accent'} outline={!p.paid && !late} />
+                        </Pressable>
+                      </Card>
+                    );
+                  })}
+              </View>
+            </View>
+          </Appear>
+        ))
+      ) : (
+        <Card>
           <Empty text="Платежей нет." />
-        )}
-      </List>
-      <View style={{ flexDirection: 'row' }}>
+        </Card>
+      )}
+      <View style={{ flexDirection: 'row', marginTop: 4 }}>
         <Button title="Добавить платёж" icon="plus" kind="ghost" onPress={() => router.push('/new-payment')} />
       </View>
       <T v="small" style={{ textAlign: 'center' }}>
-        Нажмите на статус, чтобы отметить оплату
+        Нажмите на статус, чтобы отметить оплату · {dm(T0)}
       </T>
     </Screen>
   );

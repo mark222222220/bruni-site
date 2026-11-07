@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Platform, useColorScheme } from 'react-native';
 import type { Role } from './types';
 
-export type Skin = 'auto' | 'glass-dark' | 'glass-light' | 'solid-dark' | 'solid-light';
+export type Skin = 'avp' | 'auto' | 'glass-dark' | 'glass-light' | 'solid-dark' | 'solid-light';
 export type Accent = 'orange' | 'blue' | 'green' | 'violet';
 
 export type Settings = {
@@ -21,7 +21,7 @@ export type Settings = {
 };
 
 export const DEFAULTS: Settings = {
-  skin: 'auto',
+  skin: 'avp',
   accent: 'orange',
   big: false,
   haptics: true,
@@ -35,6 +35,13 @@ export const DEFAULTS: Settings = {
 export type Theme = {
   dark: boolean;
   glass: boolean;
+  /** фирменная тема AVP: градиентные карточки, свечение, точечная сетка */
+  premium: boolean;
+  cardFrom: string;
+  cardTo: string;
+  edge: string;
+  accent2: string;
+  accent3: string;
   bg: string;
   fg: string;
   dim: string;
@@ -63,12 +70,38 @@ const ACCENTS: Record<Accent, { c: string; on: string }> = {
   violet: { c: '#A95CF0', on: '#FFFFFF' },
 };
 
+const ACCENT_SHADES: Record<Accent, [string, string]> = {
+  orange: ['#FF9A5C', '#C9470A'],
+  blue: ['#5AB0FF', '#0060C0'],
+  green: ['#6BD884', '#1E8A3A'],
+  violet: ['#C99BFF', '#7A35C0'],
+};
+
 export function makeTheme(s: Settings, system: 'light' | 'dark' | null | undefined): Theme {
   const skin: Exclude<Skin, 'auto'> = s.skin === 'auto' ? (system === 'light' ? 'glass-light' : 'glass-dark') : s.skin;
-  const dark = skin.endsWith('dark');
+  const premium = skin === 'avp';
+  const dark = premium || skin.endsWith('dark');
   const glass = skin.startsWith('glass');
   const a = ACCENTS[s.accent];
-  const base = dark
+  const [a2, a3] = ACCENT_SHADES[s.accent];
+  const base = premium
+    ? {
+        bg: '#0A0A0C',
+        fg: '#F4F4F2',
+        dim: 'rgba(244,244,242,0.62)',
+        mute: 'rgba(244,244,242,0.36)',
+        line: 'rgba(255,255,255,0.07)',
+        card: '#18181B',
+        card2: '#2A2A30',
+        field: '#101013',
+        ok: '#4FD18B',
+        warn: '#FFB020',
+        bad: '#FF4D3D',
+        okBg: 'rgba(79,209,139,0.14)',
+        warnBg: 'rgba(255,176,32,0.14)',
+        badBg: 'rgba(255,77,61,0.14)',
+      }
+    : dark
     ? {
         bg: glass ? '#08080C' : '#0C0C0E',
         fg: '#F5F5F7',
@@ -104,7 +137,21 @@ export function makeTheme(s: Settings, system: 'light' | 'dark' | null | undefin
   const wallpaper = glass
     ? `radial-gradient(circle at 10% 5%, ${a.c}${dark ? '88' : '55'} 0%, transparent 55%), radial-gradient(circle at 95% 45%, #6B3CFF${dark ? '77' : '44'} 0%, transparent 55%), radial-gradient(circle at 20% 100%, #0A84FF${dark ? '55' : '33'} 0%, transparent 55%)`
     : undefined;
-  return { ...base, dark, glass, accent: a.c, onAccent: a.on, wallpaper, fs: s.big ? 18 : 16 };
+  return {
+    ...base,
+    dark,
+    glass,
+    premium,
+    cardFrom: premium ? '#222226' : base.card,
+    cardTo: premium ? '#141417' : base.card,
+    edge: premium ? 'rgba(255,255,255,0.075)' : base.line,
+    accent: a.c,
+    accent2: a2,
+    accent3: a3,
+    onAccent: a.on,
+    wallpaper,
+    fs: s.big ? 18 : 16,
+  };
 }
 
 type Ctx = {

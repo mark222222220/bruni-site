@@ -7,6 +7,7 @@ import { useSettings, type Accent, type Skin } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 const SKINS: { id: Skin; name: string; bg: string; card: string; split?: boolean }[] = [
+  { id: 'avp', name: 'AVP', bg: '#1a0c05', card: '#26262b' },
   { id: 'auto', name: 'Как в системе', bg: '#111', card: 'rgba(127,127,127,0.35)', split: true },
   { id: 'glass-dark', name: 'Стекло тёмное', bg: '#1a0f14', card: 'rgba(255,255,255,0.22)' },
   { id: 'glass-light', name: 'Стекло светлое', bg: '#f3e6ee', card: 'rgba(255,255,255,0.75)' },
@@ -27,7 +28,7 @@ export default function Settings() {
   const [sure, setSure] = useState<'reset' | 'demo' | null>(null);
 
   return (
-    <Screen title="Настройки" subtitle="Оформление и удобство" back>
+    <Screen kicker="Приложение" title="Настройки" subtitle="Оформление и удобство" back>
       <Section>Тема</Section>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
         {SKINS.map((k) => {

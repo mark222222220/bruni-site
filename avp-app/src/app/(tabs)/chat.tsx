@@ -2,7 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Glass, Icon, Screen, T, styles } from '@/components/ui';
+import { Avatar, Fill, Glass, Icon, Screen, T, styles } from '@/components/ui';
 import { useData } from '@/lib/data';
 import { useSettings } from '@/lib/settings';
 import { CHANNELS, ROLES, type Message } from '@/lib/types';
@@ -51,7 +51,8 @@ export default function Chat() {
     return (
       <View style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '86%', marginVertical: 4 }}>
         {me ? (
-          <View style={{ backgroundColor: t.accent, borderRadius: 18, borderTopRightRadius: 6, paddingHorizontal: 12, paddingVertical: 9, gap: 3 }}>
+          <View style={{ borderRadius: 20, borderTopRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 3, overflow: 'hidden', zIndex: 0 }}>
+            <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
             {m.quote ? <T v="small" style={{ color: t.onAccent, opacity: 0.75, borderLeftWidth: 3, borderLeftColor: t.onAccent, paddingLeft: 8 }}>{m.quote}</T> : null}
             <T v="body" style={{ color: t.onAccent }} selectable>
               {m.text}
@@ -61,25 +62,28 @@ export default function Chat() {
             </T>
           </View>
         ) : (
-          <Glass radius={18} style={{ borderTopLeftRadius: 6, paddingHorizontal: 12, paddingVertical: 9, gap: 3 }}>
-            <T v="small" style={{ fontSize: 12 }}>
-              <T v="b" style={{ fontSize: 12 }}>
-                {m.author}
-              </T>{' '}
-              · {ROLES[m.role]?.name ?? ''} · {new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-            </T>
-            {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
-            <T v="body" selectable>
-              {m.text}
-            </T>
-          </Glass>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+            <Avatar name={m.author} />
+            <Glass radius={20} style={{ borderBottomLeftRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 4, flexShrink: 1 }}>
+              <T v="small" style={{ fontSize: 12 }}>
+                <T v="b" style={{ fontSize: 12, color: t.accent2 }}>
+                  {m.author}
+                </T>
+                {`  ${ROLES[m.role]?.name ?? ''} · ${new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`}
+              </T>
+              {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
+              <T v="body" selectable>
+                {m.text}
+              </T>
+            </Glass>
+          </View>
         )}
       </View>
     );
   };
 
   return (
-    <Screen title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
+    <Screen kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
@@ -97,8 +101,8 @@ export default function Chat() {
                   accessibilityState={{ selected: on }}
                 >
                   {on ? (
-                    <View style={{ backgroundColor: t.accent, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9 }}>
-                      <T v="b" style={{ color: t.onAccent, fontSize: 14 }}>
+                    <View style={{ backgroundColor: t.accent + '1F', borderWidth: 1.5, borderColor: t.accent, borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8 }}>
+                      <T v="b" style={{ color: t.fg, fontSize: 14 }}>
                         {c.name}
                       </T>
                     </View>

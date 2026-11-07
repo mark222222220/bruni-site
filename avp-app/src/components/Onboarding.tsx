@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Field, Glass, Logo, T, Wallpaper } from './ui';
+import { Button, Field, Glass, Mark, T, Wallpaper } from './ui';
 import { useSettings } from '@/lib/settings';
 import { ROLES, type Role } from '@/lib/types';
 
@@ -17,11 +17,14 @@ export function Onboarding() {
       <Wallpaper />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingTop: ins.top + 40, paddingBottom: ins.bottom + 24, gap: 16 }} keyboardShouldPersistTaps="handled">
-          <Logo size={64} />
+          <View style={{ gap: 8, marginBottom: 8 }}>
+            <T v="kicker">Пульт руководителя завода</T>
+            <Mark width={220} />
+            <T v="label" style={{ letterSpacing: 9, fontSize: 14, marginLeft: 4 }}>system</T>
+          </View>
           <View style={{ gap: 6 }}>
-            <T v="title">AVP system</T>
-            <T v="body" style={{ color: t.dim }}>
-              Маржа, склад, заказы, деньги и чаты завода — на одном экране.
+            <T v="h" style={{ color: t.dim, fontFamily: 'Rubik_400Regular', lineHeight: 28 }}>
+              Маржа, склад, заказы, деньги и люди — на одном экране.
             </T>
           </View>
           <Glass style={{ padding: 16, gap: 14 }}>
@@ -37,7 +40,7 @@ export function Onboarding() {
                   }}
                   accessibilityRole="radio"
                   accessibilityState={{ checked: role === r }}
-                  style={{ borderRadius: 14, borderWidth: 2, borderColor: role === r ? t.accent : t.line, padding: 12, backgroundColor: t.field }}
+                  style={{ borderRadius: 16, borderWidth: 1.5, borderColor: role === r ? t.accent : t.line, padding: 14, backgroundColor: role === r ? t.accent + '14' : t.field }}
                 >
                   <T v="b">{ROLES[r].name}</T>
                   <T v="small">{ROLES[r].about}</T>

@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
-import { Banner, Button, Empty, Glass, Icon, Item, List, Pill, Screen, Segmented, Steps, T, styles } from '@/components/ui';
+import { Appear, Banner, Button, Card, Empty, Glass, Icon, Pill, Screen, Segmented, Steps, T, styles } from '@/components/ui';
 import { statusIndex, statusName, useData } from '@/lib/data';
 import { dm, fmt, money, today, tomorrow } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
@@ -9,28 +9,60 @@ import type { Order } from '@/lib/types';
 
 type F = 'work' | 'ready' | 'shipped' | 'all';
 
-function OrderRow({ o, first }: { o: Order; first?: boolean }) {
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <T v="label" style={{ fontSize: 10 }}>
+        {label}
+      </T>
+      <T v="num" style={{ fontSize: 16 }}>
+        {value}
+      </T>
+    </View>
+  );
+}
+
+function OrderCard({ o }: { o: Order }) {
   const { t } = useSettings();
   const T0 = today();
   const late = o.status !== 'shipped' && !!o.ship && o.ship < T0;
   const tone = o.status === 'shipped' ? 'ok' : late ? 'bad' : o.status === 'ready' ? 'warn' : 'neutral';
+  const when = o.ship === tomorrow() ? 'завтра' : o.ship === T0 ? 'сегодня' : '';
   return (
-    <Item first={first} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}>
-      <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
-        <T v="b" style={{ flex: 1 }} numberOfLines={2}>
-          №{o.no} · {o.client}
+    <Card onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })} tone={late ? 'bad' : undefined} style={{ gap: 12 }}>
+      <View style={[styles.row, { justifyContent: 'space-between' }]}>
+        <T v="b" style={{ color: t.accent, fontSize: 13, letterSpacing: 1 }}>
+          № {o.no}
         </T>
         <Pill text={late ? 'просрочен' : statusName(o.status)} tone={tone} />
       </View>
-      <T v="small">
-        {o.formula} · {fmt(o.qty)} шт · {fmt(o.area, 1)} м² · {money(o.sum)} ₽
-      </T>
-      <T v="small" style={late ? { color: t.bad } : undefined}>
-        отгрузка {dm(o.ship)}
-        {o.ship === tomorrow() ? ' · завтра' : o.ship === T0 ? ' · сегодня' : ''}
-      </T>
-      <Steps index={statusIndex(o.status)} />
-    </Item>
+      <View style={{ gap: 3 }}>
+        <T v="h" style={{ fontSize: 18 }} numberOfLines={2}>
+          {o.client}
+        </T>
+        <T v="small" style={{ letterSpacing: 0.4 }}>
+          {o.formula}
+        </T>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Metric label="Штук" value={fmt(o.qty)} />
+        <Metric label="Площадь" value={`${fmt(o.area, 1)} м²`} />
+        <Metric label="Сумма" value={`${money(o.sum)} ₽`} />
+      </View>
+      <View style={{ gap: 0 }}>
+        <Steps index={statusIndex(o.status)} />
+        <View style={[styles.row, { justifyContent: 'space-between', marginTop: 10 }]}>
+          <View style={[styles.row, { gap: 6 }]}>
+            <Icon name="truck" size={16} color={late ? t.bad : t.dim} />
+            <T v="small" style={late ? { color: t.bad } : undefined}>
+              отгрузка {dm(o.ship)}
+              {when ? ` · ${when}` : ''}
+            </T>
+          </View>
+          <Icon name="chev" size={16} color={t.mute} />
+        </View>
+      </View>
+    </Card>
   );
 }
 
@@ -46,10 +78,11 @@ export default function Orders() {
     if (qq) L = L.filter((o) => `${o.no} ${o.client} ${o.formula}`.toLowerCase().includes(qq));
     return L.sort((a, b) => (a.ship || '9').localeCompare(b.ship || '9') || a.no - b.no);
   }, [snap.orders, f, q]);
+  const sum = list.reduce((a, o) => a + o.sum, 0);
 
   return (
-    <Screen title="Заказы" subtitle="Производство и отгрузки">
-      <Glass radius={16} style={[styles.row, { paddingHorizontal: 14, height: 48 }]}>
+    <Screen kicker="Производство" title="Заказы" subtitle={`${list.length} на ${money(sum)} ₽`}>
+      <Glass radius={18} style={[styles.row, { paddingHorizontal: 16, height: 50 }]}>
         <Icon name="search" size={18} color={t.mute} />
         <TextInput
           value={q}
@@ -66,16 +99,26 @@ export default function Orders() {
         value={f}
         onChange={setF}
         options={[
-          { value: 'work', label: `В работе ${n('work')}` },
-          { value: 'ready', label: `Готовы ${n('ready')}` },
-          { value: 'shipped', label: `Отгруж. ${n('shipped')}` },
-          { value: 'all', label: `Все ${n('all')}` },
+          { value: 'work', label: `В работе · ${n('work')}` },
+          { value: 'ready', label: `Готовы · ${n('ready')}` },
+          { value: 'shipped', label: `Отгружены · ${n('shipped')}` },
+          { value: 'all', label: `Все · ${n('all')}` },
         ]}
       />
       {loading ? <Banner text="Загружаю заказы…" /> : null}
-      <List>{list.length ? list.map((o, i) => <OrderRow key={o.id} o={o} first={i === 0} />) : <Empty text={q ? 'Ничего не нашлось.' : 'Здесь пока пусто.'} />}</List>
+      {list.length ? (
+        list.map((o, i) => (
+          <Appear key={o.id} i={i}>
+            <OrderCard o={o} />
+          </Appear>
+        ))
+      ) : (
+        <Card>
+          <Empty text={q ? 'Ничего не нашлось.' : 'Здесь пока пусто.'} />
+        </Card>
+      )}
       {s.role === 'boss' || s.role === 'sales' ? (
-        <View style={{ flexDirection: 'row' }}>
+        <View style={{ flexDirection: 'row', marginTop: 4 }}>
           <Button title="Новый заказ" icon="plus" onPress={() => router.push('/new-order')} />
         </View>
       ) : null}
