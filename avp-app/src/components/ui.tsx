@@ -23,6 +23,8 @@ import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect,
 import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
+/** Метка сборки: видно, какая версия открыта на телефоне. */
+export const APP_BUILD = '0.4.2';
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 
@@ -34,6 +36,17 @@ const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 export function Fill({ colors, radius = 0, vertical = true, opacity = 1 }: { colors: [string, string] | [string, string, string]; radius?: number; vertical?: boolean; opacity?: number }) {
   const id = useSvgId();
   const [box, setBox] = useState({ w: 0, h: 0 });
+  if (Platform.OS !== 'web') {
+    // на телефоне градиент рисует сама система — без SVG и без замеров
+    const deg = vertical ? 165 : 115;
+    const stops = colors.map((c, i) => `${c} ${Math.round((i / (colors.length - 1)) * 100)}%`).join(', ');
+    return (
+      <View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, { zIndex: -1, borderRadius: radius, opacity, backgroundColor: colors[colors.length - 1], experimental_backgroundImage: `linear-gradient(${deg}deg, ${stops})` }]}
+      />
+    );
+  }
   return (
     <View
       pointerEvents="none"
@@ -511,7 +524,7 @@ export function Screen({
                 AVP
               </T>
               <T v="label" style={{ fontSize: 9, letterSpacing: 3 }}>
-                system
+                {`system · ${APP_BUILD}`}
               </T>
             </View>
           </View>
