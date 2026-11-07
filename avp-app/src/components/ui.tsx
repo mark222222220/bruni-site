@@ -30,20 +30,32 @@ const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
    Фон и заливки
    ========================================================= */
 
-/** Градиентная заливка на весь родитель. */
+/** Градиентная заливка на весь родитель. Размер меряем сами: на iOS SVG не растягивается по «100%». */
 export function Fill({ colors, radius = 0, vertical = true, opacity = 1 }: { colors: [string, string] | [string, string, string]; radius?: number; vertical?: boolean; opacity?: number }) {
   const id = useSvgId();
+  const [box, setBox] = useState({ w: 0, h: 0 });
   return (
-    <Svg style={[StyleSheet.absoluteFill, { zIndex: -1 }]} width="100%" height="100%" pointerEvents="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2={vertical ? '0.25' : '1'} y2={vertical ? '1' : '0.4'}>
-          {colors.map((c, i) => (
-            <Stop key={i} offset={i / (colors.length - 1)} stopColor={c} stopOpacity={opacity} />
-          ))}
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" rx={radius} ry={radius} fill={`url(#${id})`} />
-    </Svg>
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { zIndex: -1, borderRadius: radius, overflow: 'hidden', backgroundColor: box.w ? 'transparent' : colors[1] }]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (Math.round(width) !== box.w || Math.round(height) !== box.h) setBox({ w: Math.round(width), h: Math.round(height) });
+      }}
+    >
+      {box.w > 0 && box.h > 0 ? (
+        <Svg width={box.w} height={box.h}>
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2={vertical ? '0.25' : '1'} y2={vertical ? '1' : '0.4'}>
+              {colors.map((c, i) => (
+                <Stop key={i} offset={i / (colors.length - 1)} stopColor={c} stopOpacity={opacity} />
+              ))}
+            </LinearGradient>
+          </Defs>
+          <Rect x={0} y={0} width={box.w} height={box.h} fill={`url(#${id})`} />
+        </Svg>
+      ) : null}
+    </View>
   );
 }
 
@@ -64,23 +76,34 @@ export function Glow({ color, size, style, opacity = 0.35 }: { color: string; si
   );
 }
 
-/** Фон экрана: фирменный тёмный с оранжевым свечением и точечной сеткой, либо фон выбранной темы. */
-export function Wallpaper() {
-  const { t } = useSettings();
+function Dots() {
   const id = useSvgId();
-  if (t.premium)
-    return (
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.bg, overflow: 'hidden' }]}>
-        <Glow color={t.accent} size={760} opacity={0.32} style={{ top: -380, right: -300 }} />
-        <Glow color="#3A3A44" size={700} opacity={0.5} style={{ bottom: -360, left: -320 }} />
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  return (
+    <View style={StyleSheet.absoluteFill} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
+      {box.w ? (
+        <Svg width={box.w} height={box.h}>
           <Defs>
             <Pattern id={id} width="26" height="26" patternUnits="userSpaceOnUse">
               <Circle cx="2" cy="2" r="1" fill="#FFFFFF" fillOpacity={0.055} />
             </Pattern>
           </Defs>
-          <Rect width="100%" height="100%" fill={`url(#${id})`} />
+          <Rect width={box.w} height={box.h} fill={`url(#${id})`} />
         </Svg>
+      ) : null}
+    </View>
+  );
+}
+
+/** Фон экрана: фирменный тёмный с оранжевым свечением и точечной сеткой, либо фон выбранной темы. */
+export function Wallpaper() {
+  const { t } = useSettings();
+  if (t.premium)
+    return (
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.bg, overflow: 'hidden' }]}>
+        <Glow color={t.accent} size={760} opacity={0.32} style={{ top: -380, right: -300 }} />
+        <Glow color="#3A3A44" size={700} opacity={0.5} style={{ bottom: -360, left: -320 }} />
+        <Dots />
       </View>
     );
   return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.bg }, t.wallpaper ? { experimental_backgroundImage: t.wallpaper } : null]} />;
@@ -527,6 +550,10 @@ export function Screen({
           {children}
         </View>
       )}
+      {/* затемнение под часами, чтобы прокрученный контент не просвечивал под статус-баром */}
+      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: ins.top + 14 }}>
+        <Fill colors={[t.bg, t.bg + 'EE', t.bg + '00']} />
+      </View>
     </View>
   );
 }
