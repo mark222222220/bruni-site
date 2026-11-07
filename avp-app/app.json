@@ -39,6 +39,21 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "owner": "markrrrrrs-team",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": false
+      },
+      "eas": {
+        "projectId": "13d79515-d757-4586-b342-02cd975981b3"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/13d79515-d757-4586-b342-02cd975981b3"
     }
   }
 }
