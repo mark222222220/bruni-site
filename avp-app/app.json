@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "AVP system",
+    "slug": "avp-system",
+    "scheme": "avp",
+    "version": "0.4.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#08080c",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "ru.glasshouse.avp",
+      "infoPlist": { "ITSAppUsesNonExemptEncryption": false }
+    },
+    "android": {
+      "package": "ru.glasshouse.avp",
+      "adaptiveIcon": {
+        "backgroundColor": "#FF6A1A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": { "favicon": "./assets/favicon.png", "output": "single" },
+    "plugins": ["expo-router", "expo-font"],
+    "experiments": { "typedRoutes": false }
+  }
+}

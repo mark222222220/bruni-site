@@ -1,0 +1,84 @@
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { TextInput, View } from 'react-native';
+import { Banner, Button, Empty, Glass, Icon, Item, List, Pill, Screen, Segmented, Steps, T, styles } from '@/components/ui';
+import { statusIndex, statusName, useData } from '@/lib/data';
+import { dm, fmt, money, today, tomorrow } from '@/lib/format';
+import { useSettings } from '@/lib/settings';
+import type { Order } from '@/lib/types';
+
+type F = 'work' | 'ready' | 'shipped' | 'all';
+
+function OrderRow({ o, first }: { o: Order; first?: boolean }) {
+  const { t } = useSettings();
+  const T0 = today();
+  const late = o.status !== 'shipped' && !!o.ship && o.ship < T0;
+  const tone = o.status === 'shipped' ? 'ok' : late ? 'bad' : o.status === 'ready' ? 'warn' : 'neutral';
+  return (
+    <Item first={first} onPress={() => router.push({ pathname: '/order/[id]', params: { id: o.id } })}>
+      <View style={[styles.row, { justifyContent: 'space-between', alignItems: 'flex-start' }]}>
+        <T v="b" style={{ flex: 1 }} numberOfLines={2}>
+          №{o.no} · {o.client}
+        </T>
+        <Pill text={late ? 'просрочен' : statusName(o.status)} tone={tone} />
+      </View>
+      <T v="small">
+        {o.formula} · {fmt(o.qty)} шт · {fmt(o.area, 1)} м² · {money(o.sum)} ₽
+      </T>
+      <T v="small" style={late ? { color: t.bad } : undefined}>
+        отгрузка {dm(o.ship)}
+        {o.ship === tomorrow() ? ' · завтра' : o.ship === T0 ? ' · сегодня' : ''}
+      </T>
+      <Steps index={statusIndex(o.status)} />
+    </Item>
+  );
+}
+
+export default function Orders() {
+  const { snap, loading } = useData();
+  const { s, t } = useSettings();
+  const [f, setF] = useState<F>('work');
+  const [q, setQ] = useState('');
+  const n = (k: F) => snap.orders.filter((o) => (k === 'work' ? o.status !== 'shipped' : k === 'all' ? true : o.status === k)).length;
+  const list = useMemo(() => {
+    let L = snap.orders.filter((o) => (f === 'work' ? o.status !== 'shipped' : f === 'all' ? true : o.status === f));
+    const qq = q.trim().toLowerCase();
+    if (qq) L = L.filter((o) => `${o.no} ${o.client} ${o.formula}`.toLowerCase().includes(qq));
+    return L.sort((a, b) => (a.ship || '9').localeCompare(b.ship || '9') || a.no - b.no);
+  }, [snap.orders, f, q]);
+
+  return (
+    <Screen title="Заказы" subtitle="Производство и отгрузки">
+      <Glass radius={16} style={[styles.row, { paddingHorizontal: 14, height: 48 }]}>
+        <Icon name="search" size={18} color={t.mute} />
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder="Номер, клиент или формула"
+          placeholderTextColor={t.mute}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          style={{ flex: 1, color: t.fg, fontSize: 16, fontFamily: 'Rubik_400Regular', height: '100%' }}
+          accessibilityLabel="Поиск заказов"
+        />
+      </Glass>
+      <Segmented
+        value={f}
+        onChange={setF}
+        options={[
+          { value: 'work', label: `В работе ${n('work')}` },
+          { value: 'ready', label: `Готовы ${n('ready')}` },
+          { value: 'shipped', label: `Отгруж. ${n('shipped')}` },
+          { value: 'all', label: `Все ${n('all')}` },
+        ]}
+      />
+      {loading ? <Banner text="Загружаю заказы…" /> : null}
+      <List>{list.length ? list.map((o, i) => <OrderRow key={o.id} o={o} first={i === 0} />) : <Empty text={q ? 'Ничего не нашлось.' : 'Здесь пока пусто.'} />}</List>
+      {s.role === 'boss' || s.role === 'sales' ? (
+        <View style={{ flexDirection: 'row' }}>
+          <Button title="Новый заказ" icon="plus" onPress={() => router.push('/new-order')} />
+        </View>
+      ) : null}
+    </Screen>
+  );
+}
