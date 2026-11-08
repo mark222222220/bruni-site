@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { FlatList, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { FlatList, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Fill, Glass, Icon, IconButton, Screen, T, styles } from '@/components/ui';
-import { MEET_RE } from '@/lib/team';
+import { useCalls } from '@/lib/calls';
+import { MEET_RE, type Member, useTeam } from '@/lib/team';
 import { useData } from '@/lib/data';
 import { useSettings } from '@/lib/settings';
 import { CHANNELS, ROLES, type Message } from '@/lib/types';
@@ -37,6 +38,16 @@ export default function Chat() {
   const [text, setText] = useState('');
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   const [kb, setKb] = useState(false);
+  const { team } = useTeam();
+  const { startCall } = useCalls();
+  const [callTo, setCallTo] = useState<Member | null>(null);
+  const others = team.filter((m) => m.name !== s.name);
+  const byName = (n: string) => others.find((m) => m.name === n) ?? null;
+  const pickCall = (m: Member | null) => {
+    if (!m) return;
+    tap();
+    setCallTo(m);
+  };
   useEffect(() => {
     const a = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKb(true));
     const b = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKb(false));
@@ -93,7 +104,9 @@ export default function Chat() {
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
-            <Avatar name={m.author} />
+            <Pressable onPress={() => pickCall(byName(m.author))} accessibilityRole="button" accessibilityLabel={`Позвонить: ${m.author}`} hitSlop={6}>
+              <Avatar name={m.author} />
+            </Pressable>
             <Glass radius={20} style={{ borderBottomLeftRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 4, flexShrink: 1 }}>
               <T v="small" style={{ fontSize: 12 }}>
                 <T v="b" style={{ fontSize: 12, color: t.accent2 }}>
@@ -114,7 +127,7 @@ export default function Chat() {
   };
 
   return (
-    <Screen compact={kb} right={kind === 'cloud' ? <IconButton icon="phone" label="Звонки и видеосовещание" onPress={() => router.push('/team')} /> : undefined} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
+    <Screen compact={kb} right={kind === 'cloud' ? <IconButton icon="video" label="Видеосовещание с выбранными" onPress={() => router.push('/team')} /> : undefined} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
@@ -155,6 +168,23 @@ export default function Chat() {
               );
             })}
           </ScrollView>
+          {kind === 'cloud' && others.length && !kb ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 14, paddingTop: 12, paddingBottom: 2 }}>
+              {others.map((m) => (
+                <Pressable key={m.id} onPress={() => pickCall(m)} accessibilityRole="button" accessibilityLabel={`Позвонить: ${m.name}`} style={{ alignItems: 'center', gap: 5, width: 62 }}>
+                  <View>
+                    <Avatar name={m.name} size={48} />
+                    <View style={{ position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: t.bg }}>
+                      <Icon name="phone" size={11} color={t.onAccent} stroke={2.4} />
+                    </View>
+                  </View>
+                  <T v="small" style={{ fontSize: 11, color: t.fg }} numberOfLines={1}>
+                    {m.name.split(' ')[0]}
+                  </T>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : null}
         </View>
         <FlatList
           data={msgs}
@@ -203,6 +233,49 @@ export default function Chat() {
           </Glass>
         </View>
       </KeyboardAvoidingView>
+      <Modal visible={!!callTo} transparent animationType="fade" onRequestClose={() => setCallTo(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={() => setCallTo(null)}>
+          <Pressable onPress={() => {}} style={{ backgroundColor: t.premium ? '#141417' : t.dark ? '#1C1C1F' : '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 20, paddingBottom: ins.bottom + 20, gap: 14 }}>
+            <View style={[styles.row, { gap: 14 }]}>
+              <Avatar name={callTo?.name ?? ''} size={56} />
+              <View style={{ flex: 1 }}>
+                <T v="h">{callTo?.name}</T>
+                <T v="small">{callTo ? ROLES[callTo.role]?.name : ''} · звонок через интернет внутри AVP</T>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {[
+                { video: false, icon: 'phone', label: 'Звонок' },
+                { video: true, icon: 'video', label: 'Видео' },
+              ].map((b) => (
+                <Pressable
+                  key={b.label}
+                  onPress={() => {
+                    const m = callTo;
+                    setCallTo(null);
+                    if (m) startCall({ id: m.id, name: m.name }, b.video);
+                  }}
+                  accessibilityRole="button"
+                  style={({ pressed }) => ({ flex: 1, opacity: pressed ? 0.8 : 1 })}
+                >
+                  <View style={{ height: 64, borderRadius: 20, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 10, zIndex: 0 }}>
+                    <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
+                    <Icon name={b.icon} size={24} color={t.onAccent} stroke={2.2} />
+                    <T v="b" style={{ color: t.onAccent, fontSize: 17 }}>
+                      {b.label}
+                    </T>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setCallTo(null)} style={{ alignItems: 'center', paddingVertical: 8 }}>
+              <T v="b" style={{ color: t.dim }}>
+                Отмена
+              </T>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
