@@ -66,7 +66,7 @@ export default function More() {
         {auth.required ? <Item title="Выйти" sub="на этом телефоне" onPress={auth.signOut} /> : null}
       </List>
       <T v="small" style={{ textAlign: 'center' }}>
-        AVP system · версия 0.4 · Гласс-Хаус Крым
+        AVP system · версия 0.5 · Гласс-Хаус Крым
       </T>
     </Screen>
   );

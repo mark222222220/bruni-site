@@ -67,7 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return 'База не подключена';
     const { error } = await supabase.auth.signInWithPassword({ email: loginToEmail(login), password });
     if (!error) return null;
-    return /invalid/i.test(error.message) ? 'Неверный логин или пароль' : 'Нет связи. Проверьте интернет и попробуйте ещё раз';
+    if (/invalid/i.test(error.message)) return 'Неверный логин или пароль';
+    if (/fetch|network/i.test(error.message)) return 'Нет связи. Проверьте интернет и попробуйте ещё раз';
+    return `Не удалось войти: ${error.message}`;
   }, []);
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut();

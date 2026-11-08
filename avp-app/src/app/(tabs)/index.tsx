@@ -21,7 +21,8 @@ export default function Home() {
   const can = (x: Sec) => sections.includes(x);
   const go = (x: Sec) => router.navigate(pathFor(x, s.role) as '/');
   const ok = d.balance >= d.due;
-  const sh = SHEETS?.main;
+  // «Главный» есть только у руководителя и бухгалтера
+  const sh = SHEETS?.main?.money?.value ? SHEETS.main : undefined;
   const spark = sh?.weekly.length ? sh.weekly.map((w) => w.rev ?? 0) : CASH_HISTORY;
   const marginPct = sh?.margin.pct ?? d.avgMargin;
   const overdueM = SHEETS?.shipments.overdueSummary.match(/(\d+)\s*заказ/);
