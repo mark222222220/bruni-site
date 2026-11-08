@@ -24,7 +24,7 @@ import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '0.5.0';
+export const APP_BUILD = '0.5.1';
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 
@@ -500,7 +500,9 @@ export function Screen({
   back,
   scroll = true,
   right,
+  compact,
 }: {
+  compact?: boolean;
   title: string;
   kicker?: string;
   subtitle?: string;
@@ -512,7 +514,7 @@ export function Screen({
   const { t, s } = useSettings();
   const ins = useSafeAreaInsets();
   const head = (
-    <View style={{ paddingTop: ins.top + 8 + (Platform.OS === 'web' ? 56 : 0), paddingBottom: 14, gap: 18 }}>
+    <View style={{ paddingTop: ins.top + 8 + (Platform.OS === 'web' ? 56 : 0), paddingBottom: compact ? 8 : 14, gap: 18 }}>
       <View style={styles.row}>
         {back ? (
           <IconButton icon="back" label="Назад" onPress={() => (router.canGoBack() ? router.back() : router.replace('/more'))} />
@@ -541,11 +543,13 @@ export function Screen({
         </Pressable>
         <IconButton icon="settings" label="Настройки" onPress={() => router.push('/settings')} />
       </View>
-      <View style={{ gap: 6 }}>
-        {kicker ? <T v="kicker">{kicker}</T> : null}
-        <T v="title">{title}</T>
-        {subtitle ? <T v="small">{subtitle}</T> : null}
-      </View>
+      {compact ? null : (
+        <View style={{ gap: 6 }}>
+          {kicker ? <T v="kicker">{kicker}</T> : null}
+          <T v="title">{title}</T>
+          {subtitle ? <T v="small">{subtitle}</T> : null}
+        </View>
+      )}
     </View>
   );
   const pad = { paddingHorizontal: 16, paddingBottom: ins.bottom + 120, gap: 14 };

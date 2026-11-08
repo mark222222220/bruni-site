@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Fill, Glass, Icon, Screen, T, styles } from '@/components/ui';
 import { useData } from '@/lib/data';
@@ -16,6 +16,15 @@ export default function Chat() {
   const [quote, setQuote] = useState<string | null>(params.q ?? null);
   const [text, setText] = useState('');
   const input = useRef<ComponentRef<typeof TextInput>>(null);
+  const [kb, setKb] = useState(false);
+  useEffect(() => {
+    const a = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKb(true));
+    const b = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKb(false));
+    return () => {
+      a.remove();
+      b.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (params.ch) setCh(params.ch);
@@ -83,7 +92,7 @@ export default function Chat() {
   };
 
   return (
-    <Screen kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
+    <Screen compact={kb} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
@@ -142,7 +151,7 @@ export default function Chat() {
           }
           style={{ flex: 1 }}
         />
-        <View style={{ gap: 6, paddingBottom: ins.bottom + 70 }}>
+        <View style={{ gap: 6, paddingBottom: kb ? 8 : ins.bottom + 70 }}>
           {quote ? (
             <Glass radius={16} style={[styles.row, { paddingHorizontal: 12, paddingVertical: 8 }]}>
               <View style={{ width: 3, alignSelf: 'stretch', backgroundColor: t.accent, borderRadius: 2 }} />

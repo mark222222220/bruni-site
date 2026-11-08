@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { AppState } from 'react-native';
 import { demoSnapshot } from './demo';
 import { setSheets, sheetsFromRows, type Sheets } from './sheets';
 import { supabase } from './supabase';
@@ -89,11 +90,17 @@ export function cloudBackend(sb: SupabaseClient): Backend {
     },
     loadSheets: fetchSheets,
     subscribe(onTable) {
+      let last = '';
+      const pushMessages = (rows: Message[]) => {
+        const key = rows.length + ':' + (rows[0]?.id ?? '');
+        if (key === last) return;
+        last = key;
+        onTable('messages', rows);
+      };
+      const refresh = () => fetchMessages().then(pushMessages).catch(() => {});
       const ch = sb
         .channel('avp-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
-          fetchMessages().then((rows) => onTable('messages', rows)).catch(() => {});
-        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'factory_snapshot' }, () => {
           fetchSheets()
             .then((sh) => {
@@ -101,9 +108,18 @@ export function cloudBackend(sb: SupabaseClient): Backend {
               onTable('sheets', []);
             })
             .catch(() => {});
-        })
-        .subscribe();
+        });
+      // токен вошедшего пользователя передаём до подписки, иначе права в базе не пустят канал
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) sb.realtime.setAuth(data.session.access_token);
+        ch.subscribe();
+      });
+      // подстраховка: проверяем новые сообщения раз в 4 секунды и при возврате в приложение
+      const timer = setInterval(refresh, 4000);
+      const app = AppState.addEventListener('change', (st) => st === 'active' && refresh());
       return () => {
+        clearInterval(timer);
+        app.remove();
         sb.removeChannel(ch);
       };
     },
