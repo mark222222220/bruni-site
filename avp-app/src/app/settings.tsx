@@ -1,8 +1,10 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Button, Field, Glass, Item, List, Screen, Section, Stepper, T, Toggle } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { supabase } from '@/lib/supabase';
 import { useSettings, type Accent, type Skin } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
@@ -26,6 +28,19 @@ export default function Settings() {
   const { kind, resetDemo } = useData();
   const [name, setName] = useState(s.name);
   const [sure, setSure] = useState<'reset' | 'demo' | null>(null);
+  const auth = useAuth();
+  const [phone, setPhone] = useState('');
+  const [phoneMsg, setPhoneMsg] = useState('');
+  useEffect(() => {
+    if (!supabase || !auth.profile) return;
+    supabase.from('profiles').select('*').eq('id', auth.profile.id).maybeSingle().then(({ data }) => setPhone((data as { phone?: string } | null)?.phone ?? ''));
+  }, [auth.profile]);
+  const savePhone = async () => {
+    if (!supabase || !auth.profile) return;
+    const { error } = await supabase.from('profiles').update({ phone: phone.trim() }).eq('id', auth.profile.id);
+    setPhoneMsg(error ? 'Не сохранилось. Руководитель ещё не включил телефоны в базе.' : 'Сохранено — коллеги смогут позвонить');
+    tap(error ? 'warning' : 'success');
+  };
 
   return (
     <Screen kicker="Приложение" title="Настройки" subtitle="Оформление и удобство" back>
@@ -88,7 +103,14 @@ export default function Settings() {
 
       <Section>Профиль</Section>
       <Glass style={{ padding: 16, gap: 12 }}>
-        <Field label="Как вас зовут" value={name} onChangeText={setName} onBlur={() => name.trim() && set({ name: name.trim() })} returnKeyType="done" maxLength={40} />
+        {auth.required ? (
+          <>
+            <Field label="Мой телефон" value={phone} onChangeText={setPhone} onBlur={savePhone} onSubmitEditing={savePhone} keyboardType="phone-pad" placeholder="+7 978 000-00-00" maxLength={20} returnKeyType="done" />
+            {phoneMsg ? <T v="small">{phoneMsg}</T> : <T v="small">Нужен, чтобы коллеги могли позвонить и набрать FaceTime из AVP.</T>}
+          </>
+        ) : (
+          <Field label="Как вас зовут" value={name} onChangeText={setName} onBlur={() => name.trim() && set({ name: name.trim() })} returnKeyType="done" maxLength={40} />
+        )}
       </Glass>
       <List>
         <Item first title={`Роль: ${ROLES[s.role].name}`} sub={ROLES[s.role].about} onPress={() => router.push('/role')} />

@@ -33,6 +33,7 @@ function Root() {
         <Stack.Screen name="report-money" />
         <Stack.Screen name="settings" />
         <Stack.Screen name="staff" />
+        <Stack.Screen name="team" />
         <Stack.Screen name="role" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         <Stack.Screen name="order/[id]" options={sheet} />
         <Stack.Screen name="new-order" options={{ ...sheet, sheetAllowedDetents: [1] }} />
