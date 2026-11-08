@@ -34,7 +34,7 @@ function OrderCard({ o }: { o: Order }) {
         <T v="b" style={{ color: t.accent, fontSize: 13, letterSpacing: 1 }}>
           № {o.no}
         </T>
-        <Pill text={late ? 'просрочен' : statusName(o.status)} tone={tone} />
+        <Pill text={late ? (o.fromSheet ? `просрочен ${Math.max(1, Math.round((Date.now() - Date.parse(o.ship)) / 864e5))} дн.` : 'просрочен') : o.fromSheet ? (o.production && o.production !== '—' ? o.production : 'в реестре') : statusName(o.status)} tone={tone} />
       </View>
       <View style={{ gap: 3 }}>
         <T v="h" style={{ fontSize: 18 }} numberOfLines={2}>
@@ -45,7 +45,7 @@ function OrderCard({ o }: { o: Order }) {
         </T>
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <Metric label="Штук" value={fmt(o.qty)} />
+        <Metric label={o.fromSheet ? 'СП' : 'Штук'} value={o.fromSheet && !o.qty ? '—' : fmt(o.qty)} />
         <Metric label="Площадь" value={`${fmt(o.area, 1)} м²`} />
         <Metric label="Сумма" value={`${money(o.sum)} ₽`} />
       </View>

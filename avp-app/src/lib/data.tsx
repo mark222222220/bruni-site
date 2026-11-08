@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { makeBackend, type Backend } from './backend';
 import { BALANCE } from './demo';
-import { dm, fmt, money, today, tomorrow, uid } from './format';
+import { addDays, dm, fmt, money, today, tomorrow, uid } from './format';
+import { SHEETS, tablesFromSheets } from './sheets';
 import { useSettings } from './settings';
 import { STATUSES, type Snapshot, type TableName, type Tables } from './types';
 
@@ -27,7 +28,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     try {
       const snap = await backend.load();
-      setSt({ snap: { ...snap }, loading: false, error: null });
+      // цифры завода — из снимка таблицы отца; чат остаётся своим
+      const merged = SHEETS && backend.kind === 'local' ? { ...snap, ...tablesFromSheets(SHEETS) } : snap;
+      setSt({ snap: { ...merged }, loading: false, error: null });
     } catch (e) {
       setSt((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : 'Нет связи с базой' }));
     }
@@ -101,7 +104,9 @@ export function useData() {
 /* ---------- производные цифры и сигналы ---------- */
 export const statusIndex = (s: string) => Math.max(0, STATUSES.findIndex((x) => x.id === s));
 export const statusName = (s: string) => STATUSES[statusIndex(s)].name;
-export const needToOrder = (s: { qty: number; min: number; pack: number }) => Math.max(s.pack, Math.ceil((s.min * 2 - s.qty) / s.pack) * s.pack);
+export const needToOrder = (s: { qty: number; min: number; pack: number; toOrder?: number; status?: string }) =>
+  s.status !== undefined ? s.toOrder ?? 0 : Math.max(s.pack, Math.ceil((s.min * 2 - s.qty) / s.pack) * s.pack);
+export const isLow = (x: { qty: number; min: number; status?: string }) => (x.status !== undefined ? x.status === 'Мало' : x.qty <= x.min);
 
 export type Signal = { id: string; level: 'bad' | 'warn'; title: string; detail: string; channel: string };
 
@@ -112,21 +117,31 @@ export function useDerived() {
     const T = today();
     const active = snap.orders.filter((o) => o.status !== 'shipped');
     const overdue = active.filter((o) => o.ship && o.ship < T);
-    const low = snap.stock.filter((x) => x.qty <= x.min).sort((a, b) => a.sort - b.sort);
+    const low = snap.stock.filter(isLow).sort((a, b) => a.sort - b.sort);
     const unpaid = snap.payments.filter((p) => !p.paid);
-    const due = unpaid.reduce((a, p) => a + (Number(p.amount) || 0), 0);
+    // к оплате — как у отца: просроченные и всё на 2 недели вперёд
+    const horizon = addDays(14);
+    const due = unpaid.filter((p) => !SHEETS || p.date <= horizon).reduce((a, p) => a + (Number(p.amount) || 0), 0);
     const revTotal = snap.clients.reduce((a, c) => a + c.rev, 0);
     const avgMargin = revTotal ? snap.clients.reduce((a, c) => a + c.rev * c.work, 0) / revTotal : 0;
     const shipTomorrow = active.filter((o) => o.ship === tomorrow());
     const signals: Signal[] = [
-      ...overdue.map((o) => ({ id: 'o' + o.id, level: 'bad' as const, title: `Заказ №${o.no} просрочен — ${o.client}`, detail: `отгрузка была ${dm(o.ship)}, сейчас: ${statusName(o.status).toLowerCase()}`, channel: 'orders' })),
-      ...low.map((x) => ({ id: 's' + x.id, level: x.qty > x.min * 0.5 ? ('warn' as const) : ('bad' as const), title: `${x.name}: осталось ${fmt(x.qty)} ${x.unit}`, detail: `минимум ${fmt(x.min)} — в заявке ${fmt(needToOrder(x))} ${x.unit}`, channel: 'stock' })),
+      ...(SHEETS ? [] : overdue).map((o) => ({ id: 'o' + o.id, level: 'bad' as const, title: `Заказ №${o.no} просрочен — ${o.client}`, detail: `отгрузка была ${dm(o.ship)}, сейчас: ${statusName(o.status).toLowerCase()}`, channel: 'orders' })),
+      ...low.map((x) =>
+        x.status !== undefined
+          ? { id: 's' + x.id, level: (x.days ?? 0) < 2 ? ('bad' as const) : ('warn' as const), title: `${x.name}: ${fmt(x.qty, 1)} ${x.unit}`, detail: `хватит на ${fmt(x.days ?? 0, 1)} дн. · расход ${fmt(x.weekly ?? 0)} ${x.unit} в неделю`, channel: 'stock' }
+          : { id: 's' + x.id, level: x.qty > x.min * 0.5 ? ('warn' as const) : ('bad' as const), title: `${x.name}: осталось ${fmt(x.qty)} ${x.unit}`, detail: `минимум ${fmt(x.min)} — в заявке ${fmt(needToOrder(x))} ${x.unit}`, channel: 'stock' },
+      ),
+      ...(SHEETS ? SHEETS.main.warnings.map((w, i) => ({ id: 'w' + i, level: (/просроч|не виден|остаток/.test(w) ? 'bad' : 'warn') as 'bad' | 'warn', title: w.split(':')[0], detail: w.includes(':') ? w.slice(w.indexOf(':') + 1).trim() : '', channel: /банк|платёж|платеж/.test(w) ? 'money' : /приход|склад/.test(w) ? 'stock' : 'orders' })) : []),
+      ...snap.clients
+        .filter((c) => c.signal)
+        .map((c) => ({ id: 'cs' + c.id, level: 'warn' as const, title: `${c.name}: ${c.signal}`, detail: Object.entries(c.byMonth ?? {}).map(([m, v]) => `${m} ${fmt(v, 1)}%`).join(' → '), channel: 'orders' })),
       ...snap.clients
         .filter((c) => c.work < s.thr)
         .sort((a, b) => a.work - b.work)
         .map((c) => ({ id: 'c' + c.id, level: 'bad' as const, title: `Маржа ${fmt(c.work)}% у клиента ${c.name}`, detail: `ниже порога ${s.thr}% — пересмотреть цену`, channel: 'orders' })),
-      ...(BALANCE < due ? [{ id: 'cash', level: 'bad' as const, title: `Не хватает на платежи: ${money(due - BALANCE)} ₽`, detail: 'перенесите платёж или ускорьте оплату от клиентов', channel: 'money' }] : []),
+      ...((SHEETS?.bank?.balance ?? BALANCE) < due ? [{ id: 'cash', level: 'bad' as const, title: `Не хватает на платежи: ${money(due - (SHEETS?.bank?.balance ?? BALANCE))} ₽`, detail: 'перенесите платёж или ускорьте оплату от клиентов', channel: 'money' }] : []),
     ];
-    return { active, overdue, low, unpaid, due, avgMargin, revTotal, shipTomorrow, signals, balance: BALANCE };
+    return { active, overdue, low, unpaid, due, avgMargin, revTotal, shipTomorrow, signals, balance: SHEETS?.bank?.balance ?? SHEETS?.main.money.amount ?? BALANCE };
   }, [snap, s.thr]);
 }

@@ -30,9 +30,9 @@ export function MarginScreen({ back }: { back?: boolean }) {
             </Ring>
             <View style={{ flex: 1, gap: 4 }}>
               <T v="label">Средняя маржа</T>
-              <T v="b">после материалов и работы</T>
+              <T v="b">{snap.clients.some((c) => c.fromSheet) ? 'за 6 месяцев, по актам' : 'после материалов и работы'}</T>
               <T v="small">
-                {below.length ? `${below.length} клиента ниже порога — ${fmt(below.reduce((a, c) => a + c.rev, 0), 1)} млн/мес оборота` : 'Все клиенты выше порога'}
+                {below.length ? `Ниже порога: ${below.length} — ${fmt(below.reduce((a, c) => a + c.rev, 0), 1)} млн оборота` : `Все ${snap.clients.length} клиентов выше порога`}
               </T>
             </View>
           </View>
@@ -85,7 +85,7 @@ export function MarginScreen({ back }: { back?: boolean }) {
                       </T>
                       {c.example ? <Pill text="пример" /> : null}
                     </View>
-                    <T v="small">
+                    <T v="small" style={c.signal ? { color: t.warn } : undefined}>
                       {c.kind}
                       {c.city ? ` · ${c.city}` : ''}
                     </T>
@@ -100,10 +100,17 @@ export function MarginScreen({ back }: { back?: boolean }) {
                 <Bar value={c.work * 2} color={low ? t.bad : undefined} height={7} />
                 <T v="small">
                   <T v="b" style={{ fontSize: 13, color: t.fg }}>
-                    {fmt(c.rev, 1)} млн/мес
+                    {c.fromSheet ? `${fmt(c.rev, 2)} млн за 6 мес` : `${fmt(c.rev, 1)} млн/мес`}
                   </T>
-                  {` · ${fmt((c.rev / total) * 100)}% оборота · после материалов ${fmt(c.mat)}%`}
+                  {c.fromSheet
+                    ? ` · ${fmt((c.rev / total) * 100, 1)}% оборота${c.rubM2 ? ` · ${fmt(c.rubM2)} ₽/м²` : ''}`
+                    : ` · ${fmt((c.rev / total) * 100)}% оборота · после материалов ${fmt(c.mat)}%`}
                 </T>
+                {c.byMonth && Object.keys(c.byMonth).length > 1 ? (
+                  <T v="small" style={c.signal ? { color: t.warn } : undefined}>
+                    {Object.entries(c.byMonth).map(([m, v]) => `${m.replace(/\s*\(идёт\)/, '')}: ${fmt(v, 1)}%`).join('  →  ')}
+                  </T>
+                ) : null}
               </Card>
             </Appear>
           );

@@ -42,3 +42,7 @@ yarn-error.*
 
 # local env with keys
 .env
+
+# данные завода из таблицы — не хранить в git
+sync/raw/
+src/data/sheets.json

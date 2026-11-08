@@ -13,6 +13,14 @@ export type Client = {
   /** маржа после материалов и труда, % */
   work: number;
   example?: boolean;
+  /** ₽ за м² в последнем полном месяце (из таблицы) */
+  rubM2?: number | null;
+  /** сигнал из таблицы, например «маржа падает» */
+  signal?: string;
+  /** маржа по месяцам из таблицы */
+  byMonth?: Record<string, number>;
+  /** данные пришли из таблицы, а не введены вручную */
+  fromSheet?: boolean;
 };
 
 export type Order = {
@@ -28,6 +36,10 @@ export type Order = {
   status: Status;
   note?: string;
   example?: boolean;
+  /** число стеклопакетов (СП) */
+  sp?: number;
+  production?: string;
+  fromSheet?: boolean;
 };
 
 export type StockItem = {
@@ -38,6 +50,15 @@ export type StockItem = {
   min: number;
   pack: number;
   sort: number;
+  /** из таблицы: «Мало», «Норма», «Нет расхода» */
+  status?: string;
+  days?: number | null;
+  toOrder?: number;
+  weekly?: number;
+  value?: number;
+  supplier?: string;
+  group?: string;
+  fromSheet?: boolean;
 };
 
 export type Payment = {
@@ -47,6 +68,10 @@ export type Payment = {
   /** YYYY-MM-DD */
   date: string;
   paid: boolean;
+  status?: string;
+  comment?: string;
+  amountText?: string;
+  fromSheet?: boolean;
 };
 
 export type Message = {

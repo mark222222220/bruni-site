@@ -38,7 +38,9 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "export:web": "expo export --platform web"
+    "export:web": "expo export --platform web",
+    "postinstall": "node scripts/ensure-snapshot.mjs",
+    "snapshot": "node scripts/build-snapshot.mjs"
   },
   "private": true
 }

@@ -4,6 +4,7 @@ import { Appear, Button, Card, CountUp, Empty, Pill, Screen, T, styles } from '@
 import { useData, useDerived } from '@/lib/data';
 import { dm, fmt, money, today } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
+import { SHEETS } from '@/lib/sheets';
 
 export function MoneyScreen({ back }: { back?: boolean }) {
   const { snap, patch } = useData();
@@ -11,22 +12,22 @@ export function MoneyScreen({ back }: { back?: boolean }) {
   const { t, tap } = useSettings();
   const ok = d.balance >= d.due;
   const T0 = today();
-  const paid = snap.payments.filter((p) => p.paid).reduce((a, p) => a + p.amount, 0);
+  const paid = snap.payments.filter((p) => p.paid && (!SHEETS || p.date >= T0)).reduce((a, p) => a + p.amount, 0);
   const list = snap.payments.slice().sort((a, b) => a.date.localeCompare(b.date));
   const days = [...new Set(list.map((p) => p.date))];
   const scale = Math.max(d.balance, d.due + paid) || 1;
   let i = 0;
 
   return (
-    <Screen kicker="Деньги" title="Платёжный календарь" back={back}>
+    <Screen kicker="Деньги" title="Платёжный календарь" subtitle={SHEETS ? SHEETS.payments.head.enough : undefined} back={back}>
       <Appear i={i++}>
         <Card tone={ok ? 'accent' : 'bad'} style={{ gap: 12 }}>
           <View style={[styles.row, { justifyContent: 'space-between' }]}>
             <T v="label">На счёте</T>
-            <Pill text="пример" />
+            <Pill text={SHEETS?.bank ? `Сбер на ${dm(SHEETS.bank.date)}` : 'пример'} />
           </View>
           <View style={[styles.row, { alignItems: 'flex-end', gap: 8 }]}>
-            <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, 1)} />
+            <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, SHEETS ? 2 : 1)} />
             <T v="h" style={{ marginBottom: 8, color: t.dim }}>
               млн ₽
             </T>
@@ -42,7 +43,7 @@ export function MoneyScreen({ back }: { back?: boolean }) {
             </View>
             <View style={[styles.row, { gap: 6 }]}>
               <View style={{ width: 9, height: 9, borderRadius: 3, backgroundColor: ok ? t.accent : t.bad }} />
-              <T v="small">к оплате {money(d.due)}</T>
+              <T v="small">{SHEETS ? 'на 2 недели' : 'к оплате'} {money(d.due)}</T>
             </View>
           </View>
           <T v="b" style={{ color: ok ? t.ok : t.bad }}>
@@ -75,8 +76,13 @@ export function MoneyScreen({ back }: { back?: boolean }) {
                             {p.title}
                           </T>
                           <T v="num" style={{ fontSize: 16, opacity: p.paid ? 0.6 : 1 }}>
-                            {fmt(p.amount)} ₽
+                            {p.amountText && !p.amount ? p.amountText : `${fmt(p.amount)} ₽`}
                           </T>
+                          {p.comment ? (
+                            <T v="small" numberOfLines={2} style={{ fontSize: 12 }}>
+                              {p.comment}
+                            </T>
+                          ) : null}
                         </View>
                         <Pressable
                           onPress={() => {
@@ -88,7 +94,11 @@ export function MoneyScreen({ back }: { back?: boolean }) {
                           accessibilityLabel={`Оплата: ${p.title}`}
                           hitSlop={8}
                         >
-                          <Pill text={p.paid ? '✓ оплачено' : late ? 'просрочен' : 'ожидается'} tone={p.paid ? 'ok' : late ? 'bad' : 'accent'} outline={!p.paid && !late} />
+                          <Pill
+                            text={p.paid ? '✓ оплачено' : p.status && p.status !== 'ожидается' ? p.status : late ? 'просрочен' : 'ожидается'}
+                            tone={p.paid ? 'ok' : (p.status && /не видно/.test(p.status)) || late ? 'bad' : 'accent'}
+                            outline={!p.paid && !late && !(p.status && /не видно/.test(p.status))}
+                          />
                         </Pressable>
                       </Card>
                     );

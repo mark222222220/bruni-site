@@ -22,7 +22,7 @@ export default function OrderCard() {
     );
   const i = statusIndex(o.status);
   const next = STATUSES[i + 1];
-  const canMove = s.role === 'boss' || s.role === 'store' || (s.role === 'sales' && o.status === 'ready');
+  const canMove = !o.fromSheet && (s.role === 'boss' || s.role === 'store' || (s.role === 'sales' && o.status === 'ready'));
   const late = o.status !== 'shipped' && o.ship < today();
   const row = (k: string, v: string, bad?: boolean) => (
     <View style={[styles.row, { justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: t.line }]}>
@@ -39,10 +39,11 @@ export default function OrderCard() {
       <Glass style={{ paddingHorizontal: 16, paddingVertical: 4 }}>
         {row('Клиент', o.client)}
         {row('Формула', o.formula)}
-        {row('Количество', `${fmt(o.qty)} шт · ${fmt(o.area, 1)} м²`)}
+        {row('Количество', o.sp != null ? `${fmt(o.sp)} СП · ${fmt(o.area, 1)} м²` : `${fmt(o.qty)} шт · ${fmt(o.area, 1)} м²`)}
         {row('Сумма', `${fmt(o.sum)} ₽`)}
         {row('Отгрузка', dm(o.ship), late)}
         {o.note ? row('Комментарий', o.note) : null}
+        {o.fromSheet ? row('Источник', 'реестр в таблице') : null}
       </Glass>
       <Glass style={{ padding: 16, gap: 2 }}>
         {STATUSES.map((st, k) => (
@@ -91,7 +92,7 @@ export default function OrderCard() {
             router.navigate({ pathname: '/chat', params: { ch: 'orders', q: `Заказ №${o.no} · ${o.client} · ${o.formula}` } });
           }}
         />
-        {s.role === 'boss' ? (
+        {s.role === 'boss' && !o.fromSheet ? (
           <Button
             title={sure ? 'Точно удалить?' : 'Удалить'}
             kind="danger"

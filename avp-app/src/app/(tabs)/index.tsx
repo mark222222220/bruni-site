@@ -7,6 +7,7 @@ import { CASH_HISTORY } from '@/lib/demo';
 import { dm, fmt, greeting, money, shortDate, tomorrow } from '@/lib/format';
 import { pathFor, SECTION_PATH } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
+import { SHEETS, updatedLabel } from '@/lib/sheets';
 import { ROLE_SECTIONS, STATUSES, type Section as Sec } from '@/lib/types';
 
 export default function Home() {
@@ -19,6 +20,13 @@ export default function Home() {
   const can = (x: Sec) => sections.includes(x);
   const go = (x: Sec) => router.navigate(pathFor(x, s.role) as '/');
   const ok = d.balance >= d.due;
+  const sh = SHEETS?.main;
+  const spark = sh?.weekly.length ? sh.weekly.map((w) => w.rev ?? 0) : CASH_HISTORY;
+  const marginPct = sh?.margin.pct ?? d.avgMargin;
+  const overdueM = SHEETS?.shipments.overdueSummary.match(/(\d+)\s*заказ/);
+  const overdueN = overdueM ? Number(overdueM[1]) : d.overdue.length;
+  const shipM = sh?.shipping.detail.match(/([\d\s,]+)\s*м²/);
+  const moneyLabel = sh ? sh.money.label.replace(/^ДЕНЬГИ НА СЧЁТЕ\s*·\s*/i, '') : 'пример';
   const area = d.active.reduce((a, o) => a + o.area, 0);
   const stages = STATUSES.slice(0, 4).map((st, k) => {
     const list = d.active.filter((o) => statusIndex(o.status) === k);
@@ -34,7 +42,7 @@ export default function Home() {
   let i = 0;
 
   return (
-    <Screen kicker={`${shortDate()}${kind === 'local' ? ' · демо' : ''}`} title={greeting() + (s.name ? `,\n${s.name.split(' ')[0]}` : '')}>
+    <Screen kicker={SHEETS ? `данные на ${updatedLabel(SHEETS.generatedAt)}` : `${shortDate()}${kind === 'local' ? ' · демо' : ''}`} title={greeting() + (s.name ? `,\n${s.name.split(' ')[0]}` : '')}>
       {error ? <Banner tone="bad" text={`Нет связи с базой: ${error}`} /> : loading ? <Banner text="Загружаю данные…" /> : null}
 
       {can('money') ? (
@@ -46,26 +54,26 @@ export default function Home() {
               </T>
               <View style={{ backgroundColor: 'rgba(17,17,19,0.14)', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 3 }}>
                 <T v="b" style={{ fontSize: 11, color: '#111113' }}>
-                  пример
+                  {moneyLabel}
                 </T>
               </View>
             </View>
             <View style={[styles.row, { alignItems: 'flex-end', gap: 8 }]}>
-              <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, 1)} style={{ color: '#111113' }} />
+              <CountUp v="huge" value={d.balance / 1e6} format={(n) => fmt(n, SHEETS ? 2 : 1)} style={{ color: '#111113' }} />
               <T v="h" style={{ color: '#111113', marginBottom: 8 }}>
                 млн ₽
               </T>
             </View>
             <View onLayout={(e) => setHeroW(e.nativeEvent.layout.width)} style={{ marginTop: 4 }}>
-              <Spark data={CASH_HISTORY} width={heroW} height={58} color="#111113" />
+              <Spark data={spark} width={heroW} height={58} color="#111113" />
             </View>
             <View style={[styles.row, { justifyContent: 'space-between', marginTop: 2 }]}>
-              <T v="small" style={{ color: 'rgba(17,17,19,0.75)' }}>
-                к оплате ≈ {money(d.due)} ₽
+              <T v="small" style={{ color: 'rgba(17,17,19,0.75)', flex: 1 }} numberOfLines={2}>
+                {sh ? `выручка по неделям · платежи на 2 нед. ≈ ${money(d.due)}` : `к оплате ≈ ${money(d.due)} ₽`}
               </T>
               <View style={{ backgroundColor: '#111113', borderRadius: 14, paddingHorizontal: 11, paddingVertical: 5 }}>
                 <T v="b" style={{ fontSize: 12, color: ok ? t.accent2 : '#FF6B5E' }}>
-                  {ok ? 'хватает на 2 недели' : `не хватает ${money(d.due - d.balance)}`}
+                  {ok ? (SHEETS ? 'платежи покрыты' : 'хватает на 2 недели') : `не хватает ${money(d.due - d.balance)}`}
                 </T>
               </View>
             </View>
@@ -79,33 +87,33 @@ export default function Home() {
             <Card onPress={can('margin') ? () => go('margin') : undefined} style={{ minHeight: 210 }}>
               <T v="label">Маржа</T>
               <View style={{ alignSelf: 'center', marginTop: 6 }}>
-                <Ring value={d.avgMargin / 50} size={108} stroke={10} color={d.avgMargin < s.thr ? t.bad : undefined}>
-                  <CountUp v="num" value={d.avgMargin} format={(n) => `${fmt(n)}%`} style={{ fontSize: 24 }} />
+                <Ring value={marginPct / 50} size={108} stroke={10} color={marginPct < s.thr ? t.bad : undefined}>
+                  <CountUp v="num" value={marginPct} format={(n) => `${fmt(n)}%`} style={{ fontSize: 24 }} />
                 </Ring>
               </View>
-              <T v="small" style={{ alignSelf: 'center' }}>
-                средняя · порог {s.thr}%
+              <T v="small" style={{ alignSelf: 'center', textAlign: 'center' }} numberOfLines={2}>
+                {sh ? `${sh.margin.label.replace(/^МАРЖА\s*·\s*/i, '').toLowerCase()} · ${SHEETS?.kv.prosh_marzh ? 'прошлый ' + SHEETS.kv.prosh_marzh.value : ''}` : `средняя · порог ${s.thr}%`}
               </T>
             </Card>
           </View>
           <View style={{ flex: 1, gap: 12 }}>
             <Card onPress={() => go('orders')} style={{ flex: 1 }}>
-              <T v="label">Отгрузки завтра</T>
-              <CountUp value={d.shipTomorrow.length} format={(n) => fmt(n)} />
+              <T v="label">{sh ? sh.shipping.label.replace(/^ОТГРУЗКА\s*·\s*/i, 'Отгрузка ') : 'Отгрузки завтра'}</T>
+              <CountUp value={sh ? parseInt(sh.shipping.value, 10) || 0 : d.shipTomorrow.length} format={(n) => fmt(n)} />
               <T v="small">
-                {fmt(d.shipTomorrow.reduce((a, o) => a + o.area, 0), 1)} м² · {dm(tomorrow())}
+                {sh ? `заказов · ${shipM ? shipM[1].trim() : '—'} м²` : `${fmt(d.shipTomorrow.reduce((a, o) => a + o.area, 0), 1)} м² · ${dm(tomorrow())}`}
               </T>
             </Card>
-            <Card onPress={() => go('orders')} tone={d.overdue.length ? 'bad' : undefined} style={{ flex: 1 }}>
-              <T v="label">В работе</T>
+            <Card onPress={() => go('orders')} tone={overdueN ? 'bad' : undefined} style={{ flex: 1 }}>
+              <T v="label">{SHEETS ? 'Просрочено' : 'В работе'}</T>
               <View style={[styles.row, { alignItems: 'flex-end', gap: 6 }]}>
-                <CountUp value={d.active.length} format={(n) => fmt(n)} />
+                <CountUp value={SHEETS ? overdueN : d.active.length} format={(n) => fmt(n)} style={SHEETS && overdueN ? { color: t.bad } : undefined} />
                 <T v="small" style={{ marginBottom: 6 }}>
                   заказов
                 </T>
               </View>
-              <T v="small" style={d.overdue.length ? { color: t.bad } : undefined}>
-                {d.overdue.length ? `${d.overdue.length} просрочен` : `${fmt(area, 0)} м² в цеху`}
+              <T v="small" style={overdueN ? { color: t.bad } : undefined}>
+                {SHEETS ? (SHEETS.main.warnings.find((w) => w.startsWith('просрочено'))?.match(/на ([\d,]+ млн ₽)/)?.[1] ?? 'срок прошёл') : d.overdue.length ? `${d.overdue.length} просрочен` : `${fmt(area, 0)} м² в цеху`}
               </T>
             </Card>
           </View>
@@ -131,7 +139,43 @@ export default function Home() {
         </Appear>
       ) : null}
 
-      <Section right={<T v="small">{fmt(area, 1)} м²</T>}>Производство</Section>
+      {sh?.forecast ? (
+        <Appear i={i++}>
+          <Card tone="accent" style={{ gap: 6 }}>
+            <T v="label">Прогноз месяца</T>
+            <T v="b" style={{ fontSize: 16, lineHeight: 22 }}>
+              {sh.forecast.split('·')[0].trim()}
+            </T>
+            {sh.forecast.includes('·') ? <T v="small">{sh.forecast.split('·').slice(1).join('·').trim()}</T> : null}
+            {sh.progress ? <T v="small">{sh.progress.split('|')[0].replace(/■/g, '•').trim()}</T> : null}
+          </Card>
+        </Appear>
+      ) : null}
+
+      {sh?.blocks.map((b) => (
+        <View key={b.title} style={{ gap: 10 }}>
+          <Section>{b.title}</Section>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+            {b.tiles.map((x) => (
+              <View key={x.label} style={{ width: '48.4%' }}>
+                <Card style={{ gap: 4, minHeight: 128, padding: 15 }}>
+                  <T v="label" style={{ fontSize: 10 }} numberOfLines={2}>
+                    {x.label}
+                  </T>
+                  <T v="big" style={{ fontSize: (x.value || '').length > 9 ? 19 : 24, lineHeight: (x.value || '').length > 9 ? 24 : 28 }} numberOfLines={2}>
+                    {x.value || '—'}
+                  </T>
+                  <T v="small" style={{ fontSize: 12 }} numberOfLines={3}>
+                    {x.detail}
+                  </T>
+                </Card>
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      <Section right={<T v="small">{fmt(area, 1)} м²</T>}>{SHEETS ? 'Отгрузки по плану' : 'Производство'}</Section>
       <Appear i={i++}>
         <Card onPress={() => go('orders')} style={{ gap: 14 }}>
           {stages.map((st, k) => (
