@@ -69,5 +69,3 @@ begin
   begin alter publication supabase_realtime add table public.factory_snapshot; exception when duplicate_object then null; end;
 end $$;
 
--- ---------- старые тестовые таблицы прошлой версии убираем, если были ----------
-drop table if exists public.clients, public.orders, public.stock, public.payments cascade;
