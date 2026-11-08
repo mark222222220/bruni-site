@@ -26,7 +26,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "output": "single"
+      "output": "single",
+      "name": "AVP system",
+      "shortName": "AVP",
+      "themeColor": "#0A0A0C",
+      "backgroundColor": "#0A0A0C",
+      "display": "standalone"
     },
     "plugins": [
       [
