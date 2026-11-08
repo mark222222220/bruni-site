@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { CallProvider } from '@/lib/calls';
 import { DataProvider } from '@/lib/data';
 import { SettingsProvider, useSettings } from '@/lib/settings';
 
@@ -26,6 +27,7 @@ function Root() {
   if (!auth.required && !s.name) return <Onboarding />;
   return (
     <DataProvider>
+      <CallProvider>
       <StatusBar style={t.dark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
         <Stack.Screen name="(tabs)" />
@@ -34,12 +36,14 @@ function Root() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="staff" />
         <Stack.Screen name="team" />
+        <Stack.Screen name="call" options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
         <Stack.Screen name="role" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         <Stack.Screen name="order/[id]" options={sheet} />
         <Stack.Screen name="new-order" options={{ ...sheet, sheetAllowedDetents: [1] }} />
         <Stack.Screen name="client/[id]" options={{ ...sheet, sheetAllowedDetents: [1] }} />
         <Stack.Screen name="new-payment" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
       </Stack>
+      </CallProvider>
     </DataProvider>
   );
 }

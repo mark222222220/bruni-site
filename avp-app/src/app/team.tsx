@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Platform, Pressable, View } from 'react-native';
 import { Appear, Avatar, Banner, Button, Card, Icon, Pill, Screen, Section, T, styles } from '@/components/ui';
+import { useCalls } from '@/lib/calls';
 import { useData } from '@/lib/data';
 import { useSettings } from '@/lib/settings';
 import { meetingUrl, normPhone, useTeam } from '@/lib/team';
@@ -12,6 +13,7 @@ export default function Team() {
   const { s, t, tap } = useSettings();
   const { send } = useData();
   const { team, loading } = useTeam();
+  const { startCall } = useCalls();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [err, setErr] = useState('');
   const others = team.filter((m) => m.name !== s.name);
@@ -48,7 +50,7 @@ export default function Team() {
   };
 
   return (
-    <Screen kicker="Команда" title="Звонки" subtitle="Позвонить сотруднику или собрать видеосовещание" back>
+    <Screen kicker="Команда" title="Звонки" subtitle="Звонок внутри AVP по Wi-Fi или интернету" back>
       {err ? <Banner tone="bad" text={err} /> : null}
       {loading ? <Banner text="Загружаю команду…" /> : null}
       {others.map((m, i) => {
@@ -72,13 +74,17 @@ export default function Team() {
                 </View>
                 <Pill text={ROLES[m.role]?.name ?? ''} tone={m.role === 'boss' ? 'accent' : 'neutral'} />
               </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Button title="Звонок" icon="phone" onPress={() => startCall({ id: m.id, name: m.name }, false)} />
+                <Button title="Видео" icon="video" onPress={() => startCall({ id: m.id, name: m.name }, true)} />
+              </View>
               {ph ? (
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Button title="Позвонить" icon="phone" kind="ghost" onPress={() => open(`tel:${ph}`)} />
+                  <Button title="По телефону" icon="phone" kind="ghost" onPress={() => open(`tel:${ph}`)} />
                   {Platform.OS === 'ios' ? <Button title="FaceTime" icon="video" kind="ghost" onPress={() => open(`facetime:${ph}`)} /> : null}
                 </View>
               ) : (
-                <T v="small">Попросите {m.name} вписать номер: «Настройки → Мой телефон».</T>
+                <T v="small">Звонок и видео — через интернет внутри AVP. Для обычного звонка {m.name} нужно вписать номер в «Настройки → Мой телефон».</T>
               )}
             </Card>
           </Appear>

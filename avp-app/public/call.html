@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AVP — звонок</title>
+<style>
+  html,body{margin:0;height:100%;background:#0A0A0C;overflow:hidden}
+  video{position:absolute;object-fit:cover;background:#0A0A0C}
+  #remote{inset:0;width:100%;height:100%}
+  #local{right:16px;bottom:200px;width:112px;height:160px;border-radius:18px;z-index:2;transform:scaleX(-1);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+</style>
+</head>
+<body>
+<video id="remote" autoplay playsinline></video>
+<video id="local" autoplay playsinline muted></video>
+<script>
+// Звонок AVP: WebRTC внутри приложения. Сигналы (SDP/ICE) передаёт приложение через Supabase Realtime.
+const q = new URLSearchParams(location.search);
+const VIDEO = q.get('video') === '1';
+const post = (m) => window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(m));
+const remote = document.getElementById('remote');
+const local = document.getElementById('local');
+let pc, stream;
+const pending = [];
+const flush = () => { while (pending.length) pc.addIceCandidate(pending.shift()).catch(() => {}); };
+
+async function init() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: VIDEO ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false,
+    });
+  } catch (e) {
+    post({ type: 'error', message: 'Нет доступа к микрофону' + (VIDEO ? ' или камере' : '') + '. Разрешите в настройках iPhone.' });
+    return;
+  }
+  if (VIDEO) local.srcObject = stream; else local.style.display = 'none';
+  pc = new RTCPeerConnection({ iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] });
+  stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+  pc.ontrack = (e) => { remote.srcObject = e.streams[0]; remote.play().catch(() => {}); };
+  pc.onicecandidate = (e) => { if (e.candidate) post({ type: 'signal', data: { ice: e.candidate.toJSON() } }); };
+  pc.onconnectionstatechange = () => post({ type: 'state', state: pc.connectionState });
+  post({ type: 'ready' });
+}
+
+window.avp = {
+  async start() {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    post({ type: 'signal', data: { sdp: pc.localDescription.toJSON() } });
+  },
+  async signal(d) {
+    if (!pc) return;
+    if (d.sdp) {
+      await pc.setRemoteDescription(d.sdp);
+      if (d.sdp.type === 'offer') {
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        post({ type: 'signal', data: { sdp: pc.localDescription.toJSON() } });
+      }
+      flush();
+    } else if (d.ice) {
+      if (pc.remoteDescription) await pc.addIceCandidate(d.ice).catch(() => {});
+      else pending.push(d.ice);
+    }
+  },
+  mute(m) { stream && stream.getAudioTracks().forEach((t) => (t.enabled = !m)); },
+  camera(on) { stream && stream.getVideoTracks().forEach((t) => (t.enabled = on)); },
+  hangup() { try { pc && pc.close(); } catch (e) {} stream && stream.getTracks().forEach((t) => t.stop()); },
+};
+init();
+</script>
+</body>
+</html>
