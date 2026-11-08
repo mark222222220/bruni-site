@@ -1,84 +1,73 @@
--- AVP system: схема облачной базы (Supabase → SQL Editor → вставить и выполнить).
--- После выполнения: Authentication → Sign In / Providers → включить «Anonymous sign-ins».
+-- AVP system — схема закрытой базы (Supabase → SQL Editor → вставить всё → Run).
+-- Можно запускать повторно: ничего не сломает.
 
-create table if not exists public.clients (
-  id text primary key,
-  name text not null,
-  kind text not null default 'Другое',
-  city text not null default '',
-  rev numeric not null default 0,      -- выручка, млн ₽ в месяц
-  mat numeric not null default 0,      -- маржа после материалов, %
-  work numeric not null default 0,     -- маржа после материалов и труда, %
-  example boolean not null default false
+-- ---------- сотрудники и роли ----------
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  name text not null default '',
+  role text not null default 'store' check (role in ('boss', 'acc', 'sales', 'store')),
+  created_at timestamptz not null default now()
 );
+alter table public.profiles enable row level security;
 
-create table if not exists public.orders (
-  id text primary key,
-  no integer not null,
-  client text not null,
-  formula text not null,
-  qty numeric not null,
-  area numeric not null,
-  sum numeric not null,
-  ship text not null,                  -- YYYY-MM-DD
-  status text not null default 'new' check (status in ('new','cut','build','ready','shipped')),
-  note text default '',
-  example boolean not null default false
+-- роль вошедшего пользователя (без рекурсии в политиках)
+create or replace function public.my_role() returns text
+language sql stable security definer set search_path = public as $$
+  select role from public.profiles where id = auth.uid()
+$$;
+revoke all on function public.my_role() from public;
+grant execute on function public.my_role() to authenticated;
+
+drop policy if exists "profiles: read team" on public.profiles;
+create policy "profiles: read team" on public.profiles for select to authenticated using (public.my_role() is not null);
+
+-- ---------- цифры завода из таблицы ----------
+-- section: main, kv, bank, payments, clients — финансы; stock, shipments — для цеха
+create table if not exists public.factory_snapshot (
+  section text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
 );
+alter table public.factory_snapshot enable row level security;
 
-create table if not exists public.stock (
-  id text primary key,
-  name text not null,
-  unit text not null,
-  qty numeric not null default 0,
-  min numeric not null default 0,
-  pack numeric not null default 1,
-  sort integer not null default 0
+drop policy if exists "snapshot: by role" on public.factory_snapshot;
+create policy "snapshot: by role" on public.factory_snapshot for select to authenticated using (
+  case
+    when public.my_role() in ('boss', 'acc') then true
+    when public.my_role() = 'sales' then section in ('stock', 'shipments', 'clients', 'meta')
+    when public.my_role() = 'store' then section in ('stock', 'shipments', 'meta')
+    else false
+  end
 );
+-- записывать может только ночная синхронизация (секретный ключ обходит RLS)
 
-create table if not exists public.payments (
-  id text primary key,
-  title text not null,
-  amount numeric not null,
-  date text not null,                  -- YYYY-MM-DD
-  paid boolean not null default false
-);
-
+-- ---------- общий чат ----------
 create table if not exists public.messages (
   id text primary key,
   channel text not null,
   author text not null,
   role text not null,
-  text text not null check (char_length(text) <= 1000),
+  text text not null check (char_length(text) between 1 and 1000),
   quote text,
-  at bigint not null                   -- мс с 1970 года
+  at bigint not null,
+  user_id uuid not null default auth.uid() references auth.users (id) on delete cascade
 );
 create index if not exists messages_channel_at on public.messages (channel, at desc);
+alter table public.messages enable row level security;
 
--- Доступ: только вошедшие пользователи приложения (анонимный вход тоже считается).
--- Это тестовый режим: любой, у кого есть приложение, может читать и менять данные.
--- Перед рабочим запуском замените на вход по приглашению и роли (см. README).
+drop policy if exists "messages: read team" on public.messages;
+create policy "messages: read team" on public.messages for select to authenticated using (public.my_role() is not null);
+drop policy if exists "messages: write own" on public.messages;
+create policy "messages: write own" on public.messages for insert to authenticated with check (user_id = auth.uid() and public.my_role() is not null);
+drop policy if exists "messages: delete own or boss" on public.messages;
+create policy "messages: delete own or boss" on public.messages for delete to authenticated using (user_id = auth.uid() or public.my_role() = 'boss');
+
+-- ---------- живые обновления ----------
 do $$
-declare t text;
 begin
-  foreach t in array array['clients','orders','stock','payments','messages'] loop
-    execute format('alter table public.%I enable row level security', t);
-    execute format('drop policy if exists "team read" on public.%I', t);
-    execute format('drop policy if exists "team write" on public.%I', t);
-    execute format('create policy "team read" on public.%I for select to authenticated using (true)', t);
-    execute format('create policy "team write" on public.%I for all to authenticated using (true) with check (true)', t);
-  end loop;
+  begin alter publication supabase_realtime add table public.messages; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.factory_snapshot; exception when duplicate_object then null; end;
 end $$;
 
--- Живые обновления между телефонами
-alter publication supabase_realtime add table public.clients, public.orders, public.stock, public.payments, public.messages;
-
--- Стартовые материалы склада (можно удалить или поправить)
-insert into public.stock (id, name, unit, qty, min, pack, sort) values
-  ('glass4', 'Стекло М1 4 мм', 'листов', 180, 120, 40, 1),
-  ('butyl', 'Бутил', 'кг', 14, 30, 7, 2),
-  ('frame16', 'Рамка алюм. 16 мм', 'м', 950, 600, 250, 3),
-  ('sieve', 'Молекулярное сито', 'кг', 22, 25, 25, 4),
-  ('sealant', 'Герметик тиокол', 'кг', 160, 100, 30, 5),
-  ('argon', 'Аргон', 'баллонов', 5, 3, 1, 6)
-on conflict (id) do nothing;
+-- ---------- старые тестовые таблицы прошлой версии убираем, если были ----------
+drop table if exists public.clients, public.orders, public.stock, public.payments cascade;
