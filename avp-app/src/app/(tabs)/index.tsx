@@ -7,13 +7,14 @@ import { CASH_HISTORY } from '@/lib/demo';
 import { dm, fmt, greeting, money, shortDate, tomorrow } from '@/lib/format';
 import { pathFor, SECTION_PATH } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
-import { SHEETS, updatedLabel } from '@/lib/sheets';
+import { updatedLabel, useSheets } from '@/lib/sheets';
 import { ROLE_SECTIONS, STATUSES, type Section as Sec } from '@/lib/types';
 
 export default function Home() {
   const { s, t } = useSettings();
   const { kind, loading, error } = useData();
   const d = useDerived();
+  const SHEETS = useSheets();
   const [heroW, setHeroW] = useState(0);
   const sections = ROLE_SECTIONS[s.role];
   if (!sections.includes('index')) return <Redirect href={SECTION_PATH[sections[0]] as '/'} />;

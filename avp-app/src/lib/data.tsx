@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { makeBackend, type Backend } from './backend';
 import { BALANCE } from './demo';
 import { addDays, dm, fmt, money, today, tomorrow, uid } from './format';
-import { SHEETS, tablesFromSheets } from './sheets';
+import { getSheets, setSheets, tablesFromSheets, useSheets } from './sheets';
 import { useSettings } from './settings';
 import { STATUSES, type Snapshot, type TableName, type Tables } from './types';
 
@@ -28,8 +28,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(async () => {
     try {
       const snap = await backend.load();
+      if (backend.loadSheets) setSheets(await backend.loadSheets());
       // цифры завода — из снимка таблицы отца; чат остаётся своим
-      const merged = SHEETS && backend.kind === 'local' ? { ...snap, ...tablesFromSheets(SHEETS) } : snap;
+      const sh = getSheets();
+      const merged = sh ? { ...snap, ...tablesFromSheets(sh) } : snap;
       setSt({ snap: { ...merged }, loading: false, error: null });
     } catch (e) {
       setSt((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : 'Нет связи с базой' }));
@@ -38,7 +40,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     reload();
-    return backend.subscribe((table, rows) => setSt((p) => ({ ...p, snap: { ...p.snap, [table]: rows } })));
+    return backend.subscribe((table, rows) => {
+      if (table === 'sheets') {
+        const sh = getSheets();
+        if (sh) setSt((p) => ({ ...p, snap: { ...p.snap, ...tablesFromSheets(sh) } }));
+        return;
+      }
+      setSt((p) => ({ ...p, snap: { ...p.snap, [table]: rows } }));
+    });
   }, [backend, reload]);
 
   /** Сначала меняем экран, потом пишем в базу; при ошибке перечитываем данные. */
@@ -113,6 +122,7 @@ export type Signal = { id: string; level: 'bad' | 'warn'; title: string; detail:
 export function useDerived() {
   const { snap } = useData();
   const { s } = useSettings();
+  const SHEETS = useSheets();
   return useMemo(() => {
     const T = today();
     const active = snap.orders.filter((o) => o.status !== 'shipped');
@@ -143,5 +153,5 @@ export function useDerived() {
       ...((SHEETS?.bank?.balance ?? BALANCE) < due ? [{ id: 'cash', level: 'bad' as const, title: `Не хватает на платежи: ${money(due - (SHEETS?.bank?.balance ?? BALANCE))} ₽`, detail: 'перенесите платёж или ускорьте оплату от клиентов', channel: 'money' }] : []),
     ];
     return { active, overdue, low, unpaid, due, avgMargin, revTotal, shipTomorrow, signals, balance: SHEETS?.bank?.balance ?? SHEETS?.main.money.amount ?? BALANCE };
-  }, [snap, s.thr]);
+  }, [snap, s.thr, SHEETS]);
 }

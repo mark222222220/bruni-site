@@ -1,8 +1,9 @@
-import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { demoSnapshot } from './demo';
-import type { Snapshot, TableName, Tables } from './types';
+import { setSheets, sheetsFromRows, type Sheets } from './sheets';
+import { supabase } from './supabase';
+import type { Message, Snapshot, TableName, Tables } from './types';
 
 export const TABLES: TableName[] = ['clients', 'orders', 'stock', 'payments', 'messages'];
 
@@ -10,7 +11,10 @@ export interface Backend {
   kind: 'local' | 'cloud';
   load(): Promise<Snapshot>;
   /** Вызывается при изменениях с других устройств. */
-  subscribe(onTable: <K extends TableName>(table: K, rows: Tables[K][]) => void): () => void;
+  /** Снимок таблицы завода (только облако). */
+  loadSheets?(): Promise<Sheets | null>;
+  /** Вызывается при изменениях с других устройств; 'sheets' — обновился снимок таблицы. */
+  subscribe(onTable: <K extends TableName | 'sheets'>(table: K, rows: K extends TableName ? Tables[K][] : never[]) => void): () => void;
   upsert<K extends TableName>(table: K, row: Tables[K]): Promise<void>;
   patch<K extends TableName>(table: K, id: string, fields: Partial<Tables[K]>): Promise<void>;
   remove(table: TableName, id: string): Promise<void>;
@@ -66,67 +70,59 @@ export function localBackend(): Backend {
   };
 }
 
-/* ---------- облачная база Supabase: вся команда, синхронно ---------- */
-export function cloudBackend(url: string, key: string): Backend {
-  const sb: SupabaseClient = createClient(url, key, {
-    auth: { storage: AsyncStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
-  });
-  const signIn = (async () => {
-    const { data } = await sb.auth.getSession();
-    if (!data.session) {
-      const { error } = await sb.auth.signInAnonymously();
-      if (error) throw error;
-    }
-  })();
-  const fetchTable = async <K extends TableName>(t: K): Promise<Tables[K][]> => {
-    await signIn;
-    let q = sb.from(t).select('*');
-    if (t === 'messages') q = q.order('at', { ascending: false }).limit(300);
-    const { data, error } = await q;
+/* ---------- закрытая база Supabase: вся команда ---------- */
+export function cloudBackend(sb: SupabaseClient): Backend {
+  const fetchMessages = async (): Promise<Message[]> => {
+    const { data, error } = await sb.from('messages').select('id,channel,author,role,text,quote,at').order('at', { ascending: false }).limit(300);
     if (error) throw error;
-    return (data ?? []) as Tables[K][];
+    return (data ?? []) as Message[];
+  };
+  const fetchSheets = async () => {
+    const { data, error } = await sb.from('factory_snapshot').select('section,data,updated_at');
+    if (error) throw error;
+    return sheetsFromRows((data ?? []) as { section: string; data: unknown; updated_at: string }[]);
   };
   return {
     kind: 'cloud',
     async load() {
-      const rows = await Promise.all(TABLES.map((t) => fetchTable(t)));
-      return Object.fromEntries(TABLES.map((t, i) => [t, rows[i]])) as Snapshot;
+      return { clients: [], orders: [], stock: [], payments: [], messages: await fetchMessages() };
     },
+    loadSheets: fetchSheets,
     subscribe(onTable) {
-      const timers: Partial<Record<TableName, ReturnType<typeof setTimeout>>> = {};
-      const channel = sb.channel('avp-all');
-      for (const t of TABLES) {
-        channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => {
-          // перечитываем таблицу целиком, пачкой раз в 300 мс — просто и надёжно для небольших таблиц
-          clearTimeout(timers[t]);
-          timers[t] = setTimeout(() => fetchTable(t).then((rows) => onTable(t, rows)).catch(() => {}), 300);
-        });
-      }
-      signIn.then(() => channel.subscribe()).catch(() => {});
+      const ch = sb
+        .channel('avp-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => {
+          fetchMessages().then((rows) => onTable('messages', rows)).catch(() => {});
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'factory_snapshot' }, () => {
+          fetchSheets()
+            .then((sh) => {
+              setSheets(sh);
+              onTable('sheets', []);
+            })
+            .catch(() => {});
+        })
+        .subscribe();
       return () => {
-        sb.removeChannel(channel);
+        sb.removeChannel(ch);
       };
     },
+    // В базу пишем только сообщения; цифры завода приходят из таблицы, отметки на телефоне локальные.
     async upsert(table, row) {
-      await signIn;
-      const { error } = await sb.from(table).upsert(row as never);
+      if (table !== 'messages') return;
+      const m = row as Message;
+      const { error } = await sb.from('messages').insert({ id: m.id, channel: m.channel, author: m.author, role: m.role, text: m.text, quote: m.quote ?? null, at: m.at });
       if (error) throw error;
     },
-    async patch(table, id, fields) {
-      await signIn;
-      const { error } = await sb.from(table).update(fields as never).eq('id', id);
-      if (error) throw error;
-    },
+    async patch() {},
     async remove(table, id) {
-      await signIn;
-      const { error } = await sb.from(table).delete().eq('id', id);
+      if (table !== 'messages') return;
+      const { error } = await sb.from('messages').delete().eq('id', id);
       if (error) throw error;
     },
   };
 }
 
 export function makeBackend(): Backend {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-  return url && key ? cloudBackend(url, key) : localBackend();
+  return supabase ? cloudBackend(supabase) : localBackend();
 }

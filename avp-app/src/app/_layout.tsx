@@ -3,7 +3,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
+import { AuthProvider, useAuth } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
 import { SettingsProvider, useSettings } from '@/lib/settings';
 
@@ -17,8 +19,11 @@ const sheet = {
 
 function Root() {
   const { s, t, ready } = useSettings();
-  if (!ready) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
-  if (!s.name) return <Onboarding />;
+  const auth = useAuth();
+  if (!ready || !auth.ready) return <View style={{ flex: 1, backgroundColor: t.bg }} />;
+  // рабочий режим: вход по логину и паролю, имя и роль — из базы
+  if (auth.required && (!auth.session || !auth.profile)) return <Login />;
+  if (!auth.required && !s.name) return <Onboarding />;
   return (
     <DataProvider>
       <StatusBar style={t.dark ? 'light' : 'dark'} />
@@ -27,6 +32,7 @@ function Root() {
         <Stack.Screen name="report-margin" />
         <Stack.Screen name="report-money" />
         <Stack.Screen name="settings" />
+        <Stack.Screen name="staff" />
         <Stack.Screen name="role" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
         <Stack.Screen name="order/[id]" options={sheet} />
         <Stack.Screen name="new-order" options={{ ...sheet, sheetAllowedDetents: [1] }} />
@@ -43,7 +49,9 @@ export default function Layout() {
   const fonts = loaded || !!error || Platform.OS === 'web';
   return (
     <SafeAreaProvider>
-      <SettingsProvider>{fonts ? <Root /> : <View style={{ flex: 1, backgroundColor: '#08080C' }} />}</SettingsProvider>
+      <SettingsProvider>
+        <AuthProvider>{fonts ? <Root /> : <View style={{ flex: 1, backgroundColor: '#08080C' }} />}</AuthProvider>
+      </SettingsProvider>
     </SafeAreaProvider>
   );
 }

@@ -4,11 +4,12 @@ import { Appear, Button, Card, CountUp, Empty, Pill, Screen, T, styles } from '@
 import { useData, useDerived } from '@/lib/data';
 import { dm, fmt, money, today } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
-import { SHEETS } from '@/lib/sheets';
+import { useSheets } from '@/lib/sheets';
 
 export function MoneyScreen({ back }: { back?: boolean }) {
   const { snap, patch } = useData();
   const d = useDerived();
+  const SHEETS = useSheets();
   const { t, tap } = useSettings();
   const ok = d.balance >= d.due;
   const T0 = today();

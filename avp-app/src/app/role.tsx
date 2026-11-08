@@ -2,11 +2,23 @@ import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { Glass, Sheet, SheetHeader, T } from '@/components/ui';
 import { SECTION_PATH } from '@/lib/nav';
+import { useAuth } from '@/lib/auth';
 import { useSettings } from '@/lib/settings';
 import { ROLE_SECTIONS, ROLES, type Role } from '@/lib/types';
 
 export default function RolePicker() {
   const { s, t, set, tap } = useSettings();
+  const auth = useAuth();
+  if (auth.required)
+    return (
+      <Sheet>
+        <SheetHeader title={ROLES[s.role].name} kicker={s.name} />
+        <Glass radius={18} style={{ padding: 16, gap: 6 }}>
+          <T v="body">{ROLES[s.role].about}</T>
+          <T v="small">Роль назначает руководитель в разделе «Ещё → Сотрудники».</T>
+        </Glass>
+      </Sheet>
+    );
   return (
     <Sheet>
       <SheetHeader title="Войти как" />

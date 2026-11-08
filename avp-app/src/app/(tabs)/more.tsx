@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { View } from 'react-native';
 import { Icon, Item, List, Pill, Screen, Section, T } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { pathFor } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
@@ -27,6 +28,7 @@ function Badge({ icon }: { icon: string }) {
 export default function More() {
   const { s } = useSettings();
   const { kind } = useData();
+  const auth = useAuth();
   const extra = ROLE_SECTIONS[s.role].slice(4);
   return (
     <Screen title="Ещё" subtitle="Все разделы">
@@ -58,8 +60,10 @@ export default function More() {
       </List>
       <Section>Профиль</Section>
       <List>
-        <Item first title={s.name} sub={ROLES[s.role].about} right={<Pill text={ROLES[s.role].name} tone="accent" />} onPress={() => router.push('/role')} />
-        <Item title="База данных" sub={kind === 'cloud' ? 'Облачная: вся команда видит изменения' : 'Демо: данные только на этом телефоне'} right={<Pill text={kind === 'cloud' ? 'облако' : 'демо'} tone={kind === 'cloud' ? 'ok' : 'warn'} />} />
+        <Item first title={s.name} sub={ROLES[s.role].about} right={<Pill text={ROLES[s.role].name} tone="accent" />} onPress={auth.required ? undefined : () => router.push('/role')} />
+        {auth.required && s.role === 'boss' ? <Item title="Сотрудники" sub="Добавить человека, выдать логин и пароль" onPress={() => router.push('/staff')} /> : null}
+        <Item title="База данных" sub={kind === 'cloud' ? 'Закрытая: данные завода видит только команда' : 'Демо: данные только на этом телефоне'} right={<Pill text={kind === 'cloud' ? 'закрытая' : 'демо'} tone={kind === 'cloud' ? 'ok' : 'warn'} />} />
+        {auth.required ? <Item title="Выйти" sub="на этом телефоне" onPress={auth.signOut} /> : null}
       </List>
       <T v="small" style={{ textAlign: 'center' }}>
         AVP system · версия 0.4 · Гласс-Хаус Крым

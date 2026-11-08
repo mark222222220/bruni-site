@@ -1,6 +1,7 @@
 // Снимок кладёт scripts/build-snapshot.mjs; в git его нет (данные завода).
 // Пустой файл создаёт scripts/ensure-snapshot.mjs при npm install — тогда приложение в демо-режиме.
 import raw from '../data/sheets.json';
+import { useSyncExternalStore } from 'react';
 import type { Client, Order, Payment, Snapshot, StockItem } from './types';
 
 /** Снимок таблицы «Пульт руководителя — Гласс-Хаус Крым». Собирается каждую ночь (scripts/build-snapshot.mjs). */
@@ -54,7 +55,44 @@ export type Sheets = {
 };
 
 const data = raw as unknown as Partial<Sheets>;
-export const SHEETS: Sheets | null = data && data.main && data.generatedAt ? (data as Sheets) : null;
+const fromFile: Sheets | null = data && data.generatedAt ? (data as Sheets) : null;
+
+/* Текущий снимок: из файла (демо/предпросмотр) или из закрытой базы (рабочий режим). */
+let current: Sheets | null = fromFile;
+const listeners = new Set<() => void>();
+export const getSheets = () => current;
+export function setSheets(next: Sheets | null) {
+  current = next;
+  listeners.forEach((l) => l());
+}
+export function useSheets() {
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l);
+      return () => listeners.delete(l);
+    },
+    getSheets,
+    getSheets,
+  );
+}
+
+/** Собирает снимок из строк таблицы factory_snapshot. Разделы, закрытые для роли, просто отсутствуют. */
+export function sheetsFromRows(rows: { section: string; data: unknown; updated_at: string }[]): Sheets | null {
+  if (!rows.length) return null;
+  const by = Object.fromEntries(rows.map((r) => [r.section, r.data])) as Record<string, any>;
+  const meta = by.meta ?? {};
+  return {
+    generatedAt: meta.generatedAt ?? rows[0].updated_at,
+    source: meta.source ?? '',
+    main: by.main ?? { updatedText: '', money: { label: '', value: '', amount: null, detail: '' }, margin: { label: '', value: '', pct: null, detail: '' }, shipping: { label: '', value: '', detail: '' }, forecast: '', progress: '', weekly: [], warnings: [], blocks: [] },
+    kv: by.kv ?? {},
+    stock: by.stock ?? [],
+    clients: by.clients ?? { list: [], total: null, signals: [] },
+    payments: by.payments ?? { head: { thisWeek: '', nextWeek: '', nextWeekNote: '', enough: '', updatedText: '' }, list: [] },
+    shipments: by.shipments ?? { head: '', overdueSummary: '', planned: [], overdue: [] },
+    bank: by.bank ?? null,
+  };
+}
 
 /** Таблицы приложения, собранные из снимка. Чат в таблицах не хранится. */
 export function tablesFromSheets(s: Sheets): Omit<Snapshot, 'messages'> {
