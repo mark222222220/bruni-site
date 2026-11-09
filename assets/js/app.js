@@ -48,14 +48,14 @@
     // На сервере (http/https) берём JSON напрямую; при открытии файла — data/catalog.js
     if (location.protocol.startsWith("http")) {
       try {
-        const r = await fetch("data/catalog.json?v=5", { cache: "no-cache" });
+        const r = await fetch("data/catalog.json?v=6", { cache: "no-cache" });
         if (r.ok) return await r.json();
       } catch (e) { /* упадём на запасной вариант */ }
     }
     if (window.CATALOG_DATA) return window.CATALOG_DATA;
     await new Promise((res, rej) => {
       const s = document.createElement("script");
-      s.src = "data/catalog.js?v=5"; s.onload = res; s.onerror = rej;
+      s.src = "data/catalog.js?v=6"; s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
     return window.CATALOG_DATA;
@@ -336,9 +336,14 @@
   const AFTER = {};
 
   /* ==========================================================================
-     Главная «Небо»: парящая витрина, вращающийся товар при прокрутке,
-     два мира брендов, созвездие категорий, частые вопросы
+     Главная «Сад»: классическая живопись — небо, облака, статуи на постаментах,
+     золотой флакон в радужном ореоле, рама с орнаментом, галерея, созвездие
      ========================================================================== */
+  const CUT = window.CUTOUTS || {};
+  const cutOf = (p) => (p && CUT[p.id] ? CUT[p.id].src : null);
+  const pp = (id) => BY_ID[id];
+  const byBrand = (b, ...cats) => (p) => p.brand === b && (!cats.length || cats.includes(p.category));
+  const pimg = (p, i = 0) => p.colors[0].images[i] || p.colors[0].images[0];
   function pick(filterFn, n, used) {
     const out = [];
     for (const p of PRODUCTS) {
@@ -348,17 +353,24 @@
     }
     return out;
   }
-  const byBrand = (b, ...cats) => (p) => p.brand === b && (!cats.length || cats.includes(p.category));
-  const pimg = (p, i = 0) => p.colors[0].images[i] || p.colors[0].images[0];
+  /* товары с вырезанным фото */
+  function cutList(kind, brand) {
+    return Object.keys(CUT).filter((id) => CUT[id].kind === kind && BY_ID[id] && (!brand || BY_ID[id].brand === brand)).map((id) => BY_ID[id]);
+  }
+  const SCRIPT = (s) => `<span class="script">${s}</span>`;
 
-  const STEPS = [
-    { word: "ОРИГИНАЛ", t: "Только <em>оригинал</em>", d: "Привозим вещи из официальных магазинов Zara и Victoria's Secret. С бирками, в фирменной упаковке.", f: byBrand("zara", "coats") },
-    { word: "СЕГОДНЯ", t: "Курьер <em>в день заказа</em>", d: () => `По ${esc(CFG.CITY === "Симферополь" ? "Симферополю" : CFG.CITY)} — в день заказа или на следующий. Бесплатно от ${fmt(CFG.DELIVERY[0].freeFrom)}.`, f: byBrand("vs", "sleep") },
-    { word: "КРЫМ", t: "Весь <em>Крым</em>", d: "Курьер и СДЭК: Севастополь, Ялта, Евпатория, Феодосия, Керчь — за 1–4 дня.", f: byBrand("zara", "dresses") },
-    { word: "ПРИМЕРКА", t: "Сначала <em>примерка</em>", d: "Примерьте в шоуруме или при курьере. Не подошло — вернём деньги.", f: byBrand("vs", "lingerie") },
-    { word: "ПРОСТО", t: "Оплата <em>как удобно</em>", d: "Картой онлайн — Мир, Visa, Mastercard — или при получении.", f: byBrand("vs", "fragrance") }
-  ];
-  const STEP_ICONS = ["✦", "☀", "◐", "♡", "₽"];
+  /* облако растром: мягкая подложка + точки */
+  const cloud = (cls, style = "") => `<div class="hc ${cls}" style="${style}" aria-hidden="true"><i class="hc-soft"></i><i class="hc-dots"></i></div>`;
+
+  /* статуя: модель без фона на мраморном постаменте */
+  function statue(p, cls = "", label = true, link = true) {
+    const src = cutOf(p); if (!src) return "";
+    const tag = link ? "a" : "span";
+    return `<${tag} class="statue ${cls}" ${link ? `href="#/p/${encodeURIComponent(p.id)}" aria-label="${esc(p.nameRu || p.name)}"` : ""}>
+      <img src="${esc(src)}" alt="${esc(p.nameRu || p.name)}" class="st-fig" decoding="async">
+      <span class="plinth"><span class="pl-top"></span><span class="pl-body">${label ? `<span class="pl-txt">${esc(p.brandName)}</span>` : ""}</span><span class="pl-base"></span></span>
+    </${tag}>`;
+  }
 
   const FAQ = [
     ["Это оригинальные вещи?", "Да. Мы покупаем вещи в официальных магазинах и на сайтах брендов и привозим их в Крым. Каждая вещь приходит с бирками."],
@@ -369,99 +381,118 @@
     ["Как вернуть вещь?", "Одежду без следов носки и с бирками можно вернуть в течение 14 дней. Подробности — на странице «Возврат»."]
   ];
 
-  /* Созвездие: координаты звёзд (в процентах) и связи */
   const STARS = [
-    { cat: "dresses", x: 12, y: 30 }, { cat: "coats", x: 26, y: 18 }, { cat: "knit", x: 34, y: 44 }, { cat: "jeans", x: 20, y: 66 },
-    { cat: "bras", x: 50, y: 26 }, { cat: "lingerie", x: 62, y: 46 }, { cat: "sleep", x: 74, y: 22 }, { cat: "fragrance", x: 86, y: 40 },
-    { cat: "bodycare", x: 80, y: 70 }, { cat: "skirts", x: 44, y: 74 }, { cat: "beauty", x: 64, y: 78 }
+    { cat: "dresses", x: 10, y: 34 }, { cat: "coats", x: 22, y: 16 }, { cat: "knit", x: 31, y: 42 }, { cat: "jeans", x: 18, y: 66 },
+    { cat: "bras", x: 48, y: 22 }, { cat: "lingerie", x: 58, y: 46 }, { cat: "sleep", x: 70, y: 18 }, { cat: "fragrance", x: 84, y: 36 },
+    { cat: "bodycare", x: 88, y: 64 }, { cat: "skirts", x: 40, y: 72 }, { cat: "beauty", x: 66, y: 76 }
   ];
   const LINKS = [[0, 1], [1, 2], [2, 0], [2, 3], [2, 4], [4, 5], [4, 6], [6, 7], [7, 5], [7, 8], [5, 10], [3, 9], [9, 10]];
 
   function pageHome() {
     const used = new Set();
-    // витрина-дуга: чередуем бренды
-    const zs = pick(byBrand("zara", "dresses", "coats", "knit", "blazers", "sets"), 6, used);
-    const vs = pick(byBrand("vs", "lingerie", "sleep", "bras", "fragrance"), 5, used);
-    const arc = []; for (let i = 0; arc.length < 11 && (zs[i] || vs[i]); i++) { if (vs[i]) arc.push(vs[i]); if (zs[i]) arc.push(zs[i]); }
-    const steps = STEPS.map((s) => ({ ...s, p: pick(s.f, 1, used)[0] })).filter((s) => s.p);
-    const zw = pick(byBrand("zara", "coats", "dresses", "knit"), 3, used);
-    const vw = pick(byBrand("vs", "sleep", "lingerie", "bras"), 3, used);
+    const zc = cutList("person", "zara"), vc = cutList("person", "vs"), objs = cutList("obj");
+    const take = (arr, n) => { const out = []; for (const p of arr) { if (out.length >= n) break; if (!used.has(p.id)) { used.add(p.id); out.push(p); } } return out; };
+    const gold = pp("vs-11289794") || objs[0]; if (gold) used.add(gold.id);
+    const heroL = take(zc.filter((p) => ["dresses", "sets"].includes(p.category)), 1)[0] || take(zc, 1)[0];
+    const heroR = take(vc.filter((p) => p.category === "sleep"), 1)[0] || take(vc, 1)[0];
+    const heroB = take(zc, 1)[0];
+    const frameObj = take(objs.filter((p) => p.id !== (gold && gold.id)), 1)[0];
+    const hall = []; const hz = take(zc, 8), hv = take(vc, 6);
+    for (let i = 0; i < Math.max(hz.length, hv.length); i++) { if (hz[i]) hall.push(hz[i]); if (hv[i]) hall.push(hv[i]); }
+    const zW = take(zc, 1)[0], vW = take(vc, 1)[0];
+    const ring = take(objs, 8);
     const fresh = PRODUCTS.filter((p) => p.isNew && !used.has(p.id));
     const mixed = []; const fz = fresh.filter((p) => p.brand === "zara"), fv = fresh.filter((p) => p.brand === "vs");
     for (let i = 0; mixed.length < 12 && (i < fz.length || i < fv.length); i++) { if (fz[i]) mixed.push(fz[i]); if (fv[i]) mixed.push(fv[i]); }
-    const finale = pick(byBrand("vs", "fragrance"), 1, used)[0] || arc[0];
 
     const stars = STARS.filter((s) => CATS[s.cat] && PRODUCTS.some((p) => p.category === s.cat)).map((s) => {
       const p = PRODUCTS.find((x) => x.category === s.cat && !used.has(x.id)) || PRODUCTS.find((x) => x.category === s.cat);
-      const n = PRODUCTS.filter((x) => x.category === s.cat).length;
-      return { ...s, p, n };
+      return { ...s, p, n: PRODUCTS.filter((x) => x.category === s.cat).length };
     });
-    const idx = Object.fromEntries(stars.map((s, i) => [s.cat, i]));
+    const nZ = PRODUCTS.filter((p) => p.brand === "zara").length, nV = PRODUCTS.length - nZ;
 
     return `
-    <section class="sky-hero" id="skyHero">
-      <div class="sh-cone" aria-hidden="true"></div>
-      <div class="sh-lamp" aria-hidden="true"></div>
-      <div class="sh-title">
-        <div class="eyebrow">Zara · Victoria's Secret · ${esc(CFG.CITY)}</div>
-        <h1><span class="sh-l"><span>Два бренда.</span></span><span class="sh-l"><span><em>Одно небо.</em></span></span></h1>
+    <section class="g-hero" id="gHero">
+      <div class="sky"></div>
+      ${cloud("c1", "--px:.25")}${cloud("c2", "--px:.12")}${cloud("c3", "--px:.4")}${cloud("c4", "--px:.2")}
+      <div class="hair hair-v" style="left:43%"><span>I · Zara — II · Victoria's Secret</span></div>
+      <div class="hair hair-h" style="top:78%"></div>
+      ${gold ? `<a class="halo-obj" href="#/p/${encodeURIComponent(gold.id)}" aria-label="${esc(gold.nameRu || gold.name)}"><i class="rainbow"></i><img src="${esc(cutOf(gold))}" alt="${esc(gold.name)}"></a>` : ""}
+      <div class="hero-statues">
+                ${heroL ? statue(heroL, "s-left") : ""}
+        ${heroR ? statue(heroR, "s-right") : ""}
       </div>
-      <div class="arc" id="arc">
-        ${arc.map((p, i) => `<a class="cap" href="#/p/${encodeURIComponent(p.id)}" data-i="${i}" aria-label="${esc(p.nameRu || p.name)}"><span class="cap-in">${img(pimg(p), p.name, "", i < 7)}<i class="gloss"></i></span></a>`).join("")}
+      <div class="g-copy">
+        <div class="kicker">${esc(CFG.STORE_NAME)} · ${esc(CFG.CITY)}</div>
+        <h1><span class="ln"><span>Мы говорим «нет»</span></span><span class="ln"><span>чаще, чем ${SCRIPT("«да»")}</span></span></h1>
+        <p>Из тысяч вещей Zara и Victoria's Secret мы оставили ${PRODUCTS.length} — те, что хочется носить, а не хранить.</p>
+        <div class="g-row"><a class="pill" href="#/catalog">Смотреть каталог</a><a class="pill pill--glass" href="#hall" data-scroll="hall">Галерея</a></div>
       </div>
-      <div class="sh-floor" aria-hidden="true"></div>
-      <div class="sh-pick">
-        <button class="sh-arr" data-arc="-1" aria-label="Предыдущий товар">‹</button>
-        <div class="sh-name" id="arcName"></div>
-        <button class="sh-arr" data-arc="1" aria-label="Следующий товар">›</button>
-      </div>
-      <a class="sh-scroll" href="#story" data-scroll="story"><span></span>Листайте</a>
+      <div class="g-scroll"><i></i>листайте</div>
     </section>
 
-    ${steps.length ? `<section class="story" id="story" style="--n:${steps.length}">
-      <div class="story-pin">
-        <div class="story-bg"></div>
-        <div class="story-words" aria-hidden="true">${steps.map((s, i) => `<span data-w="${i}">${s.word}</span>`).join("")}</div>
-        <div class="story-obj" id="storyObj">${steps.map((s, i) => `<a href="#/p/${encodeURIComponent(s.p.id)}" class="story-can" data-c="${i}">${img(pimg(s.p), s.p.name, "", i === 0)}<i class="gloss"></i></a>`).join("")}</div>
-        <div class="story-text">${steps.map((s, i) => `<div class="st" data-t="${i}">
-            <div class="st-bar"><i></i></div>
-            <div class="eyebrow">0${i + 1} / 0${steps.length}</div>
-            <h2>${s.t}</h2>
-            <p>${typeof s.d === "function" ? s.d() : s.d}</p>
-            <a class="st-prod" href="#/p/${encodeURIComponent(s.p.id)}"><b>${esc(s.p.brandName)}</b> ${esc(s.p.nameRu || s.p.name)} · ${fmt(priceOf(s.p))}</a>
-          </div>`).join("")}</div>
-        <nav class="story-dots" aria-label="Разделы">${steps.map((s, i) => `<button data-dot="${i}" aria-label="${s.t.replace(/<[^>]*>/g, "")}"><span>${STEP_ICONS[i] || "•"}</span></button>`).join("")}</nav>
+    <section class="manifest">
+      <div class="m-frame reveal">
+        <div class="m-paper">
+          <svg class="m-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H100M50 0V100M0 0L100 100M100 0L0 100" /><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="40"/></svg>
+          ${frameObj ? `<img src="${esc(cutOf(frameObj))}" alt="${esc(frameObj.name)}" class="m-obj">` : ""}
+        </div>
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+      </div>
+      <div class="m-copy">
+        <div class="kicker reveal">Цена</div>
+        <h2 class="reveal">Без скрытых доплат.<br>Цена бренда — ${SCRIPT("честно")}</h2>
+        <p class="reveal">Цена на сайте — это цена бренда в рублях по курсу плюс наша фиксированная наценка за доставку и работу. Никаких «уточните у менеджера».</p>
+        <div class="m-facts reveal">
+          <div><b>${PRODUCTS.length}</b><span>вещей в наличии</span></div>
+          <div><b>1–4</b><span>дня по Крыму</span></div>
+          <div><b>14</b><span>дней на возврат</span></div>
+        </div>
+      </div>
+    </section>
+
+    ${hall.length ? `<section class="hall" id="hall" style="--n:${hall.length}">
+      <div class="hall-pin">
+        <div class="hall-head"><div class="kicker">Галерея · ${hall.length} образов</div><h2>Анфилада ${SCRIPT("образов")}</h2></div>
+        <div class="hall-track" id="hallTrack">
+          ${hall.map((p, i) => `<figure class="exhibit" style="--i:${i}">
+            <span class="niche"></span>
+            ${statue(p, "s-hall", false)}
+            <figcaption><span class="no">№ ${String(i + 1).padStart(2, "0")}</span><b>${esc(p.nameRu || p.name)}</b><span>${esc(p.brandName)} · ${fmt(priceOf(p))}</span></figcaption>
+          </figure>`).join("")}
+          <a class="exhibit exhibit--more" href="#/catalog"><span>Все ${PRODUCTS.length}<br>${SCRIPT("вещей")}</span></a>
+        </div>
+        <div class="hall-progress"><i id="hallBar"></i></div>
       </div>
     </section>` : ""}
 
-    <section class="worlds">
-      <a class="world world--zara" href="#/catalog?brand=zara">
-        <div class="frame reveal">
-          <div class="frame-in">${zw.map((p, i) => img(pimg(p), p.name, "fz fz" + i)).join("")}</div>
-          <i class="orn tl"></i><i class="orn tr"></i><i class="orn bl"></i><i class="orn br"></i>
-        </div>
-        <div class="w-copy reveal" style="--d:.1s">
-          <div class="eyebrow">Одежда · ${PRODUCTS.filter((p) => p.brand === "zara").length} вещей</div>
-          <h2>Пальто, шёлк<br>и трикотаж. <em>Zara.</em></h2>
-          <p>Строгая шерсть, платья для вечера и мягкий трикотаж — то, в чём выходят из дома.</p>
-          <span class="pill">Смотреть Zara</span>
-        </div>
+    <section class="gardens">
+      <a class="garden garden--zara" href="#/catalog?brand=zara">
+        <div class="sky"></div>${cloud("c5")}${cloud("c6")}
+        <div class="gd-copy reveal"><div class="kicker">I · Одежда · ${nZ} вещей</div><h2>Zara<br>${SCRIPT("для улицы")}</h2><p>Пальто, платья, трикотаж и деним — то, в чём выходят из дома.</p><span class="pill">Смотреть Zara</span></div>
+        ${zW ? statue(zW, "s-garden", true, false) : ""}
       </a>
-      <a class="world world--vs" href="#/catalog?brand=vs">
-        <div class="clouds" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        <div class="w-copy reveal">
-          <div class="eyebrow">Бельё · Пижамы · Ароматы · ${PRODUCTS.filter((p) => p.brand === "vs").length} вещей</div>
-          <h2>То, что <em>под ней.</em><br>Victoria's Secret.</h2>
-          <p>Кружево, сатиновые пижамы, ароматы и уход — для себя.</p>
-          <span class="pill pill--light">Смотреть VS</span>
-        </div>
-        <div class="arch reveal" style="--d:.15s">${vw.map((p, i) => img(pimg(p), p.name, "fa fa" + i)).join("")}</div>
+      <a class="garden garden--vs" href="#/catalog?brand=vs">
+        <i class="drape" aria-hidden="true"></i>
+        <div class="gd-copy reveal"><div class="kicker">II · Бельё · Пижамы · Ароматы · ${nV} вещей</div><h2>Victoria's Secret<br>${SCRIPT("для себя")}</h2><p>Шёлк, кружево, халаты и ароматы — то, что под ней.</p><span class="pill">Смотреть VS</span></div>
+        ${vW ? statue(vW, "s-garden", true, false) : ""}
       </a>
     </section>
 
+    <section class="asked">
+      <div class="sky"></div>${cloud("c7")}${cloud("c8")}
+      <div class="asked-stage">
+      <div class="asked-ring" aria-hidden="true">${ring.map((p, i) => `<img src="${esc(cutOf(p))}" alt="" style="--a:${(360 / ring.length) * i}deg">`).join("")}</div>
+      <div class="asked-title reveal"><i class="rainbow"></i><h2>Спросили<br>до ${SCRIPT("покупки")}</h2></div>
+      </div>
+      <div class="faq">${FAQ.map(([q, a], i) => `<details class="reveal" style="--d:${i * 0.05}s"><summary><span class="no">${String(i + 1).padStart(2, "0")}</span>${esc(q)}<i></i></summary><p>${esc(a)}</p></details>`).join("")}</div>
+    </section>
+
     <section class="stars-sec" id="stars">
-      <div class="stars-bg" aria-hidden="true">${Array.from({ length: 70 }, (_, i) => `<i style="left:${(i * 37.3) % 100}%;top:${(i * 61.7) % 100}%;--d:${(i % 9) * 0.4}s;--s:${1 + (i % 3)}px"></i>`).join("")}</div>
-      <div class="stars-head reveal"><div class="eyebrow">${PRODUCTS.length} вещей · ${stars.length} созвездий</div><h2>Найдите свою <em>звезду</em></h2></div>
+      <div class="sky"></div>
+      <div class="stars-bg" aria-hidden="true">${Array.from({ length: 50 }, (_, i) => `<i style="left:${(i * 37.3) % 100}%;top:${(i * 61.7) % 70}%;--d:${(i % 9) * 0.4}s;--s:${1 + (i % 3)}px"></i>`).join("")}</div>
+      ${cloud("c9")}${cloud("c10")}
+      <div class="stars-head reveal"><div class="kicker">${stars.length} созвездий · ${PRODUCTS.length} вещей</div><h2>Найдите свою ${SCRIPT("звезду")}</h2></div>
       <div class="constel">
         <svg class="c-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${LINKS.filter(([a, b]) => stars[a] && stars[b]).map(([a, b]) => `<line x1="${stars[a].x}" y1="${stars[a].y}" x2="${stars[b].x}" y2="${stars[b].y}" pathLength="1"/>`).join("")}</svg>
         ${stars.map((s, i) => `<a class="star" href="#/catalog?cat=${s.cat}" style="left:${s.x}%;top:${s.y}%;--d:${(i * 0.12).toFixed(2)}s">
@@ -469,23 +500,17 @@
           ${s.p ? `<span class="peek">${img(pimg(s.p), s.p.name)}<span>${esc(s.p.brandName)} · ${fmt(priceOf(s.p))}</span></span>` : ""}
         </a>`).join("")}
       </div>
-      <div class="stars-list">${stars.map((s) => `<a class="chip chip--sky" href="#/catalog?cat=${s.cat}">✦ ${esc(CATS[s.cat].title)}</a>`).join("")}</div>
+      <div class="stars-list">${stars.map((s) => `<a class="chip chip--sky" href="#/catalog?cat=${s.cat}">✦ ${esc(CATS[s.cat].title)} <small>${s.n}</small></a>`).join("")}</div>
     </section>
 
-    ${mixed.length ? `<section class="section">
-      <div class="section-head reveal"><div><div class="eyebrow">Только что приехало</div><h2 class="h-2">Новинки</h2></div><a href="#/catalog?sort=new" class="link">Все</a></div>
+    ${mixed.length ? `<section class="section fresh">
+      <div class="section-head reveal"><div><div class="kicker">Только что приехало</div><h2 class="h-2">Новинки ${SCRIPT("сезона")}</h2></div><a href="#/catalog?sort=new" class="link">Все</a></div>
       <div class="rail">${mixed.map((p, i) => card(p, { d: (i % 4) * 0.06 })).join("")}</div>
     </section>` : ""}
 
-    <section class="faq-sec">
-      <h2 class="faq-title reveal">Частые<br>вопросы</h2>
-      <div class="faq">${FAQ.map(([q, a], i) => `<details class="reveal" style="--d:${i * 0.05}s"><summary>${esc(q)}<i></i></summary><p>${esc(a)}</p></details>`).join("")}</div>
-    </section>
-
     <section class="finale">
-      <div class="clouds" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-      <a class="finale-can" href="#/p/${encodeURIComponent(finale.id)}">${img(pimg(finale), finale.name)}<i class="gloss"></i></a>
-      <div class="finale-copy reveal"><h2>Всё небо — <em>в каталоге</em></h2><a class="pill" href="#/catalog">Открыть каталог · ${PRODUCTS.length}</a></div>
+      <div class="sky"></div>${cloud("c11")}${cloud("c12")}${cloud("c13")}
+      <div class="finale-copy reveal"><div class="kicker">${esc(CFG.STORE_NAME)}</div><h2>Весь сад —<br>${SCRIPT("в каталоге")}</h2><a class="pill" href="#/catalog">Открыть каталог · ${PRODUCTS.length}</a></div>
     </section>`;
   }
 
@@ -494,90 +519,42 @@
     if (homeCleanup) homeCleanup();
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.body.classList.add("is-home");
+    const hero = $("#gHero");
+    let mx = 0, my = 0, raf = 0;
 
-    /* --- Витрина-дуга --- */
-    const arcEl = $("#arc"), caps = $$(".cap", arcEl), nameEl = $("#arcName");
-    let cur = Math.floor(caps.length / 2), mx = 0, my = 0;
-    const products = caps.map((c) => BY_ID[decodeURIComponent(c.getAttribute("href").split("/p/")[1])]);
-    function layout() {
-      const n = caps.length, w = innerWidth, mob = w < 700;
-      const step = mob ? 26 : 13.5; // градусы между банками на дуге
-      caps.forEach((c, i) => {
-        let k = i - cur; if (k > n / 2) k -= n; if (k < -n / 2) k += n;
-        const a = k * step * Math.PI / 180;
-        const R = mob ? w * 0.95 : Math.min(w * 0.95, 1300);
-        const x = Math.sin(a) * R, y = (1 - Math.cos(a)) * R * 0.55;
-        const s = k === 0 ? 1.18 : Math.max(0.55, 0.92 - Math.abs(k) * 0.06);
-        const rot = k * (mob ? 9 : 6) + (k % 2 ? 8 : -6);
-        c.style.setProperty("--x", `${(x + mx * (1 + Math.abs(k)) * 4).toFixed(1)}px`);
-        c.style.setProperty("--y", `${(y + my * 6).toFixed(1)}px`);
-        c.style.setProperty("--s", s.toFixed(3));
-        c.style.setProperty("--r", `${k === 0 ? -4 : rot}deg`);
-        c.style.zIndex = 50 - Math.abs(k);
-        c.style.opacity = Math.abs(k) > (mob ? 2 : 5) ? 0 : 1;
-        c.classList.toggle("on", k === 0);
-        c.style.setProperty("--bob", `${(i * 0.37) % 2.4}s`);
-      });
-      const p = products[cur];
-      if (p) nameEl.innerHTML = `<span class="b">${esc(p.brandName)}</span><b>${esc(p.nameRu || p.name)}</b><span class="pr">${fmt(priceOf(p))}</span>`;
-    }
-    layout();
-    const shift = (d) => { cur = (cur + d + caps.length) % caps.length; nameEl.classList.remove("swap"); void nameEl.offsetWidth; nameEl.classList.add("swap"); layout(); };
-    caps.forEach((c, i) => c.addEventListener("click", (e) => { if (i !== cur) { e.preventDefault(); shift(i - cur); } }));
-    $$("[data-arc]").forEach((b) => b.addEventListener("click", () => shift(+b.dataset.arc)));
-    let auto = reduce ? null : setInterval(() => { if (scrollY < innerHeight * 0.6 && !document.hidden) shift(1); }, 3600);
-    const hero = $("#skyHero");
-    const onMove = (e) => { mx = (e.clientX / innerWidth - 0.5) * 2; my = (e.clientY / innerHeight - 0.5) * 2; layout(); };
-    if (matchMedia("(hover: hover)").matches && !reduce) hero.addEventListener("mousemove", onMove);
-    let tx = 0;
-    hero.addEventListener("touchstart", (e) => { tx = e.touches[0].clientX; }, { passive: true });
-    hero.addEventListener("touchend", (e) => { const d = e.changedTouches[0].clientX - tx; if (Math.abs(d) > 40) shift(d < 0 ? 1 : -1); }, { passive: true });
-    addEventListener("resize", layout);
-
-    /* --- История с вращающимся товаром --- */
-    const story = $("#story");
-    const cans = $$(".story-can"), texts = $$(".st"), words = $$("[data-w]"), dots = $$("[data-dot]");
-    let lastI = -1, raf = 0;
-    function onScroll() {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        if (!story) return;
-        const r = story.getBoundingClientRect(), total = r.height - innerHeight;
+    function frame() {
+      raf = 0;
+      const y = scrollY, vh = innerHeight;
+      // параллакс облаков, статуй и флакона в герое
+      if (hero && y < vh * 1.3) {
+        $$(".g-hero .hc", hero).forEach((c) => { const k = parseFloat(getComputedStyle(c).getPropertyValue("--px")) || .2; c.style.translate = `${(mx * k * 30).toFixed(1)}px ${(y * k + my * k * 16).toFixed(1)}px`; });
+        const h = $(".halo-obj", hero); if (h) h.style.translate = `${(mx * -18).toFixed(1)}px ${(y * -.25 + my * -10).toFixed(1)}px`;
+        const st = $(".hero-statues", hero); if (st) st.style.translate = `${(mx * 8).toFixed(1)}px ${(y * .12).toFixed(1)}px`;
+        const cp = $(".g-copy", hero); if (cp) { cp.style.translate = `0 ${(y * .3).toFixed(1)}px`; cp.style.opacity = Math.max(0, 1 - y / (vh * .7)); }
+      }
+      // горизонтальная галерея
+      const hall = $("#hall"), track = $("#hallTrack");
+      if (hall && track && innerWidth >= 900) {
+        const r = hall.getBoundingClientRect(), total = r.height - vh;
         const prog = Math.min(1, Math.max(0, -r.top / total));
-        const n = cans.length, f = prog * n, i = Math.min(n - 1, Math.floor(f)), local = f - i;
-        // объект вращается и «дышит» всё время прокрутки
-        const obj = $("#storyObj");
-        const rot = -22 + prog * 44 + Math.sin(f * Math.PI) * 8;
-        const sc = 0.9 + Math.sin(prog * Math.PI) * 0.22;
-        const ty = Math.sin(f * Math.PI * 2) * 14;
-        obj.style.transform = `translate3d(0, ${ty.toFixed(1)}px, 0) rotate(${rot.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
-        words.forEach((w, k) => { w.style.transform = `translateX(${((k === i ? local : k < i ? 1 : 0) * -30 + 15).toFixed(1)}vw)`; });
-        texts.forEach((t, k) => t.style.setProperty("--p", k === i ? local : k < i ? 1 : 0));
-        if (i !== lastI) {
-          lastI = i;
-          cans.forEach((c, k) => c.classList.toggle("on", k === i));
-          texts.forEach((t, k) => t.classList.toggle("on", k === i));
-          words.forEach((w, k) => w.classList.toggle("on", k === i));
-          dots.forEach((d, k) => d.classList.toggle("on", k === i));
-        }
-      });
+        const max = track.scrollWidth - innerWidth + 80;
+        track.style.transform = `translate3d(${(-prog * max).toFixed(1)}px,0,0)`;
+        const bar = $("#hallBar"); if (bar) bar.style.transform = `scaleX(${prog})`;
+        $$(".exhibit", track).forEach((ex) => { const b = ex.getBoundingClientRect(); const c = (b.left + b.width / 2) / innerWidth - .5; ex.style.setProperty("--c", c.toFixed(3)); });
+      } else if (track) track.style.transform = "";
     }
-    dots.forEach((d) => d.addEventListener("click", () => {
-      const r = story.getBoundingClientRect(), total = r.height - innerHeight;
-      window.scrollTo({ top: scrollY + r.top + total * ((+d.dataset.dot + 0.35) / cans.length), behavior: "smooth" });
-    }));
-    addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    const req = () => { if (!raf && !reduce) raf = requestAnimationFrame(frame); };
+    const onMove = (e) => { mx = (e.clientX / innerWidth - .5) * 2; my = (e.clientY / innerHeight - .5) * 2; req(); };
+    if (matchMedia("(hover: hover)").matches) addEventListener("mousemove", onMove, { passive: true });
+    addEventListener("scroll", req, { passive: true }); addEventListener("resize", req);
+    if (!reduce) frame();
 
-    /* --- Созвездие: линии прорисовываются при появлении --- */
     const st = $("#stars");
-    const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { st.classList.add("lit"); so.disconnect(); } }), { threshold: 0.25 });
-    so.observe(st);
+    const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { st.classList.add("lit"); so.disconnect(); } }), { threshold: .25 });
+    if (st) so.observe(st);
 
     homeCleanup = () => {
-      clearInterval(auto); auto = null;
-      removeEventListener("scroll", onScroll); removeEventListener("resize", layout);
+      removeEventListener("scroll", req); removeEventListener("resize", req); removeEventListener("mousemove", onMove);
       so.disconnect(); document.body.classList.remove("is-home"); homeCleanup = null;
     };
   };
