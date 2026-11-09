@@ -48,14 +48,14 @@
     // На сервере (http/https) берём JSON напрямую; при открытии файла — data/catalog.js
     if (location.protocol.startsWith("http")) {
       try {
-        const r = await fetch("data/catalog.json?v=6", { cache: "no-cache" });
+        const r = await fetch("data/catalog.json?v=7", { cache: "no-cache" });
         if (r.ok) return await r.json();
       } catch (e) { /* упадём на запасной вариант */ }
     }
     if (window.CATALOG_DATA) return window.CATALOG_DATA;
     await new Promise((res, rej) => {
       const s = document.createElement("script");
-      s.src = "data/catalog.js?v=6"; s.onload = res; s.onerror = rej;
+      s.src = "data/catalog.js?v=7"; s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
     return window.CATALOG_DATA;
@@ -360,7 +360,7 @@
   const SCRIPT = (s) => `<span class="script">${s}</span>`;
 
   /* облако растром: мягкая подложка + точки */
-  const cloud = (cls, style = "") => `<div class="hc ${cls}" style="${style}" aria-hidden="true"><i class="hc-soft"></i><i class="hc-dots"></i></div>`;
+  const cloud = (cls, style = "") => { let h = 0; for (const ch of cls) h = (h * 31 + ch.charCodeAt(0)) % 997; return `<img class="hc ${cls}" src="img/sky/cloud${h % 4}.webp" style="${style}" alt="" aria-hidden="true" decoding="async">`; };
 
   /* статуя: модель без фона на мраморном постаменте */
   function statue(p, cls = "", label = true, link = true) {
@@ -388,66 +388,148 @@
   ];
   const LINKS = [[0, 1], [1, 2], [2, 0], [2, 3], [2, 4], [4, 5], [4, 6], [6, 7], [7, 5], [7, 8], [5, 10], [3, 9], [9, 10]];
 
+  /* ---------- Фильм на главной: сцены, которые сменяются при прокрутке ---------- */
+  // Текст, который проявляется из размытия по буквам
+  const blurText = (s, cls = "") => `<span class="bt ${cls}">${s.split(/(<br>| )/).map((w) => w === "<br>" ? "<br>" : w === " " ? " " : `<span class="w">${Array.from(w).map((ch, i) => `<i style="--i:${i}">${esc(ch)}</i>`).join("")}</span>`).join("")}</span>`;
+  const blurScript = (s) => `<span class="script bt-s"><span>${esc(s)}</span></span>`;
+
   function pageHome() {
     const used = new Set();
     const zc = cutList("person", "zara"), vc = cutList("person", "vs"), objs = cutList("obj");
     const take = (arr, n) => { const out = []; for (const p of arr) { if (out.length >= n) break; if (!used.has(p.id)) { used.add(p.id); out.push(p); } } return out; };
+    const one = (arr, f) => take(f ? arr.filter(f) : arr, 1)[0] || take(arr, 1)[0];
     const gold = pp("vs-11289794") || objs[0]; if (gold) used.add(gold.id);
-    const heroL = take(zc.filter((p) => ["dresses", "sets"].includes(p.category)), 1)[0] || take(zc, 1)[0];
-    const heroR = take(vc.filter((p) => p.category === "sleep"), 1)[0] || take(vc, 1)[0];
-    const heroB = take(zc, 1)[0];
-    const frameObj = take(objs.filter((p) => p.id !== (gold && gold.id)), 1)[0];
-    const hall = []; const hz = take(zc, 8), hv = take(vc, 6);
-    for (let i = 0; i < Math.max(hz.length, hv.length); i++) { if (hz[i]) hall.push(hz[i]); if (hv[i]) hall.push(hv[i]); }
-    const zW = take(zc, 1)[0], vW = take(vc, 1)[0];
+    const aL = one(zc, (p) => ["dresses", "sets"].includes(p.category)), aR = one(vc, (p) => p.category === "sleep"), aB = one(zc);
+    const bObj = one(objs);
+    const giant = one(zc, (p) => ["coats", "jackets", "blazers"].includes(p.category));
+    const dObj = one(objs);
+    const eFig = one(vc, (p) => p.category === "sleep");
     const ring = take(objs, 8);
+    const hFig = one(zc);
+    const hall = []; const hz = take(zc, 7), hv = take(vc, 6);
+    for (let i = 0; i < Math.max(hz.length, hv.length); i++) { if (hz[i]) hall.push(hz[i]); if (hv[i]) hall.push(hv[i]); }
+    const zW = one(zc), vW = one(vc);
     const fresh = PRODUCTS.filter((p) => p.isNew && !used.has(p.id));
     const mixed = []; const fz = fresh.filter((p) => p.brand === "zara"), fv = fresh.filter((p) => p.brand === "vs");
     for (let i = 0; mixed.length < 12 && (i < fz.length || i < fv.length); i++) { if (fz[i]) mixed.push(fz[i]); if (fv[i]) mixed.push(fv[i]); }
-
-    const stars = STARS.filter((s) => CATS[s.cat] && PRODUCTS.some((p) => p.category === s.cat)).map((s) => {
-      const p = PRODUCTS.find((x) => x.category === s.cat && !used.has(x.id)) || PRODUCTS.find((x) => x.category === s.cat);
-      return { ...s, p, n: PRODUCTS.filter((x) => x.category === s.cat).length };
-    });
+    const stars = STARS.filter((s) => CATS[s.cat] && PRODUCTS.some((p) => p.category === s.cat)).map((s) => ({ ...s, n: PRODUCTS.filter((x) => x.category === s.cat).length }));
     const nZ = PRODUCTS.filter((p) => p.brand === "zara").length, nV = PRODUCTS.length - nZ;
+    const cImg = (p, cls = "") => p ? `<img src="${esc(cutOf(p))}" alt="${esc(p.nameRu || p.name)}" class="${cls}" decoding="async">` : "";
+    const tag = (p) => p ? `<a class="ptag" href="#/p/${encodeURIComponent(p.id)}"><b>${esc(p.brandName)}</b> ${esc(p.nameRu || p.name)} · ${fmt(priceOf(p))}</a>` : "";
 
     return `
-    <section class="g-hero" id="gHero">
-      <div class="sky"></div>
-      ${cloud("c1", "--px:.25")}${cloud("c2", "--px:.12")}${cloud("c3", "--px:.4")}${cloud("c4", "--px:.2")}
-      <div class="hair hair-v" style="left:43%"><span>I · Zara — II · Victoria's Secret</span></div>
-      <div class="hair hair-h" style="top:78%"></div>
-      ${gold ? `<a class="halo-obj" href="#/p/${encodeURIComponent(gold.id)}" aria-label="${esc(gold.nameRu || gold.name)}"><i class="rainbow"></i><img src="${esc(cutOf(gold))}" alt="${esc(gold.name)}"></a>` : ""}
-      <div class="hero-statues">
-                ${heroL ? statue(heroL, "s-left") : ""}
-        ${heroR ? statue(heroR, "s-right") : ""}
-      </div>
-      <div class="g-copy">
-        <div class="kicker">${esc(CFG.STORE_NAME)} · ${esc(CFG.CITY)}</div>
-        <h1><span class="ln"><span>Мы говорим «нет»</span></span><span class="ln"><span>чаще, чем ${SCRIPT("«да»")}</span></span></h1>
-        <p>Из тысяч вещей Zara и Victoria's Secret мы оставили ${PRODUCTS.length} — те, что хочется носить, а не хранить.</p>
-        <div class="g-row"><a class="pill" href="#/catalog">Смотреть каталог</a><a class="pill pill--glass" href="#hall" data-scroll="hall">Галерея</a></div>
-      </div>
-      <div class="g-scroll"><i></i>листайте</div>
-    </section>
+    <section class="film" id="film">
+      <div class="film-stage" id="stage">
 
-    <section class="manifest">
-      <div class="m-frame reveal">
-        <div class="m-paper">
-          <svg class="m-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H100M50 0V100M0 0L100 100M100 0L0 100" /><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="40"/></svg>
-          ${frameObj ? `<img src="${esc(cutOf(frameObj))}" alt="${esc(frameObj.name)}" class="m-obj">` : ""}
+        <!-- A. Небо, статуи, смена фраз, наезд на флакон -->
+        <div class="sc sc-a" data-sc="a">
+          <div class="cam" id="camA">
+            <div class="sky"></div>
+            ${cloud("a1")}${cloud("a2")}${cloud("a3")}
+            <div class="col-l" aria-hidden="true"><i></i></div>
+            <div class="a-figs">${aB ? `<div class="a-fig a-back">${cImg(aB)}</div>` : ""}${aL ? `<a class="a-fig a-left" href="#/p/${encodeURIComponent(aL.id)}">${cImg(aL)}<span class="plinth"><span class="pl-top"></span><span class="pl-body"><span class="pl-txt">Zara</span></span><span class="pl-base"></span></span></a>` : ""}${aR ? `<a class="a-fig a-right" href="#/p/${encodeURIComponent(aR.id)}">${cImg(aR)}<span class="plinth"><span class="pl-top"></span><span class="pl-body"><span class="pl-txt">VS</span></span><span class="pl-base"></span></span></a>` : ""}</div>
+            ${gold ? `<div class="a-gold" id="aGold"><i class="rainbow"></i>${cImg(gold)}</div>` : ""}
+            ${cloud("a4")}
+          </div>
+          <div class="a-copy">
+            <div class="kicker">Zara · Victoria's Secret · ${esc(CFG.CITY)}</div>
+            <h1 class="swap" id="aSwap">
+              <span class="sw" data-k="0">${blurText("Мы отбираем.")}</span>
+              <span class="sw" data-k="1">${blurText("Мы привозим.")}</span>
+              <span class="sw" data-k="2">${blurText("Вы — носите.")}</span>
+            </h1>
+            <p class="a-sub">${PRODUCTS.length} вещей Zara и Victoria's Secret. Оригинал, доставка по Крыму.</p>
+          </div>
+          <div class="hairline-h" style="top:84%"><span>Листайте</span><span>${esc(CFG.STORE_NAME)} · ${new Date().getFullYear()}</span></div>
         </div>
-        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
-      </div>
-      <div class="m-copy">
-        <div class="kicker reveal">Цена</div>
-        <h2 class="reveal">Без скрытых доплат.<br>Цена бренда — ${SCRIPT("честно")}</h2>
-        <p class="reveal">Цена на сайте — это цена бренда в рублях по курсу плюс наша фиксированная наценка за доставку и работу. Никаких «уточните у менеджера».</p>
-        <div class="m-facts reveal">
-          <div><b>${PRODUCTS.length}</b><span>вещей в наличии</span></div>
-          <div><b>1–4</b><span>дня по Крыму</span></div>
-          <div><b>14</b><span>дней на возврат</span></div>
+
+        <!-- B. Флакон крупно, затем разрезается пополам -->
+        <div class="sc sc-b" data-sc="b">
+          <div class="b-half b-l"><div class="b-in">${cImg(bObj, "b-obj")}<div class="b-copy">${blurText("Каждая вещь —<br>оригинал.")}</div></div></div>
+          <div class="b-half b-r"><div class="b-in">${cImg(bObj, "b-obj")}<div class="b-copy">${blurText("Каждая вещь —<br>оригинал.")}</div></div></div>
+          <p class="b-note">Из официальных магазинов брендов, с бирками и в фирменной упаковке.</p>
         </div>
+
+        <!-- C. Небо с линиями, растровая фигура поднимается и прокрашивается -->
+        <div class="sc sc-c" data-sc="c">
+          <div class="sky sky--deep"></div>
+          ${cloud("c1")}${cloud("c2")}
+          <div class="lines">${[18, 46, 74].map((x, i) => `<i class="lv" style="left:${x}%;--d:${i * .08}"></i>`).join("")}<i class="lh" style="top:30%"></i><i class="lh" style="top:70%"></i></div>
+          <div class="c-giant" id="cGiant">${giant ? `<img src="${esc(cutOf(giant))}" alt="" class="g-dots"><img src="${esc(cutOf(giant))}" alt="${esc(giant.name)}" class="g-paint">` : ""}</div>
+          <div class="c-copy">
+            <div class="kicker">Доставка</div>
+            <h2>${blurText("Быстрее,")}<br>${blurText("чем кажется")}</h2>
+            <div class="c-notes">
+              <div><b>Сегодня</b><span>Курьер по ${esc(CFG.CITY === "Симферополь" ? "Симферополю" : CFG.CITY)} — в день заказа. Бесплатно от ${fmt(CFG.DELIVERY[0].freeFrom)}</span></div>
+              <div><b>1–4 дня</b><span>Курьер и СДЭК по всему Крыму</span></div>
+              <div><b>Примерка</b><span>В шоуруме или при курьере</span></div>
+            </div>
+            ${tag(giant)}
+          </div>
+        </div>
+
+        <!-- D. Пергамент, рама влетает, текст «плывёт» -->
+        <div class="sc sc-d" data-sc="d">
+          <div class="d-frame" id="dFrame">
+            <div class="m-paper"><svg class="m-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 50H100M50 0V100M0 0L100 100M100 0L0 100"/><circle cx="50" cy="50" r="28"/><circle cx="50" cy="50" r="40"/></svg>${cImg(dObj, "m-obj")}</div>
+            <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+          </div>
+          <div class="d-copy">
+            <div class="kicker">Цена</div>
+            <h2 class="wavy" id="dWavy">Без скрытых доплат.<br>Цена бренда — <span class="script">честно</span></h2>
+            <p>Цена на сайте — это цена бренда в рублях по курсу плюс наша фиксированная наценка за доставку и работу. Никаких «уточните у менеджера».</p>
+            <div class="m-facts"><div><b>${PRODUCTS.length}</b><span>вещей в наличии</span></div><div><b>1–4</b><span>дня по Крыму</span></div><div><b>14</b><span>дней на возврат</span></div></div>
+          </div>
+          <div class="d-wipe"></div>
+        </div>
+
+        <!-- E. Небо, статуя с драпировкой, «нет» чаще, чем «да» -->
+        <div class="sc sc-e" data-sc="e">
+          <div class="sky"></div>${cloud("e1")}${cloud("e2")}
+          <i class="drape e-drape" aria-hidden="true"></i>
+          ${eFig ? `<a class="e-fig" href="#/p/${encodeURIComponent(eFig.id)}">${cImg(eFig)}<span class="plinth"><span class="pl-top"></span><span class="pl-body"><span class="pl-txt">Victoria's Secret</span></span><span class="pl-base"></span></span></a>` : ""}
+          <div class="e-copy">
+            <h2>${blurText("Мы говорим «нет»")}<br>${blurText("чаще, чем")} ${blurScript("«да»")}</h2>
+            <p>Из тысяч вещей двух брендов мы оставили ${PRODUCTS.length} — те, что хочется носить, а не хранить.</p>
+          </div>
+          <i class="flare" id="eFlare" aria-hidden="true"></i>
+        </div>
+
+        <!-- F. Кольцо флаконов: камера отъезжает, потом кольцо разлетается -->
+        <div class="sc sc-f" data-sc="f">
+          <div class="sky"></div>${cloud("f1")}
+          <div class="f-ring" id="fRing">${ring.map((p, i) => `<a class="f-b" href="#/p/${encodeURIComponent(p.id)}" style="--a:${(360 / ring.length) * i}deg;--k:${i}">${cImg(p)}</a>`).join("")}</div>
+          <div class="f-title"><i class="rainbow"></i><h2>${blurText("Спросили до")} ${blurScript("покупки")}</h2></div>
+          <div class="f-qa">
+            ${FAQ.slice(0, 3).map(([q, a], i) => `<div class="qa" style="--i:${i}"><i class="qa-line"></i><b>${esc(q)}</b><span>${esc(a)}</span></div>`).join("")}
+          </div>
+        </div>
+
+        <!-- G. Пролёт сквозь облака -->
+        <div class="sc sc-g" data-sc="g">
+          ${Array.from({ length: 7 }, (_, i) => cloud("g" + i, `--gx:${[-30, 26, -8, 34, -36, 12, 0][i]}vw;--gy:${[-18, -24, 20, 16, 4, 30, -2][i]}vh;--gz:${i}`)).join("")}
+        </div>
+
+        <!-- H. Созвездие категорий -->
+        <div class="sc sc-h" data-sc="h">
+          <div class="sky sky--deep"></div>
+          <div class="stars-bg" aria-hidden="true">${Array.from({ length: 50 }, (_, i) => `<i style="left:${(i * 37.3) % 100}%;top:${(i * 61.7) % 70}%;--d:${(i % 9) * 0.4}s;--s:${1 + (i % 3)}px"></i>`).join("")}</div>
+          ${hFig ? `<div class="h-fig">${cImg(hFig)}</div>` : ""}
+          <div class="constel" id="constel">
+            <svg class="c-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${LINKS.filter(([a, b]) => stars[a] && stars[b]).map(([a, b], i) => `<line x1="${stars[a].x}" y1="${stars[a].y}" x2="${stars[b].x}" y2="${stars[b].y}" pathLength="1" style="--li:${i}"/>`).join("")}</svg>
+            ${stars.map((s, i) => `<a class="star" href="#/catalog?cat=${s.cat}" style="left:${s.x}%;top:${s.y}%;--si:${i}"><i class="dot"></i><span class="lbl">${esc(CATS[s.cat].title)} <small>${s.n}</small></span></a>`).join("")}
+          </div>
+          <div class="h-card">
+            <div class="kicker">${stars.length} созвездий · ${PRODUCTS.length} вещей</div>
+            <h2>Найдите свою <span class="script">звезду</span></h2>
+            <div class="h-chips">${stars.map((s) => `<a class="chip chip--sky" href="#/catalog?cat=${s.cat}">${esc(CATS[s.cat].title)}</a>`).join("")}</div>
+            <a class="pill" href="#/catalog">Открыть каталог</a>
+          </div>
+          ${cloud("h1")}${cloud("h2")}${cloud("h3")}
+        </div>
+
+        <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="wave"><feTurbulence id="waveTurb" type="fractalNoise" baseFrequency="0.012 0.08" numOctaves="2" seed="3"/><feDisplacementMap id="waveMap" in="SourceGraphic" scale="0" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+        <div class="film-bar"><i id="filmBar"></i></div>
       </div>
     </section>
 
@@ -479,83 +561,192 @@
       </a>
     </section>
 
-    <section class="asked">
-      <div class="sky"></div>${cloud("c7")}${cloud("c8")}
-      <div class="asked-stage">
-      <div class="asked-ring" aria-hidden="true">${ring.map((p, i) => `<img src="${esc(cutOf(p))}" alt="" style="--a:${(360 / ring.length) * i}deg">`).join("")}</div>
-      <div class="asked-title reveal"><i class="rainbow"></i><h2>Спросили<br>до ${SCRIPT("покупки")}</h2></div>
-      </div>
-      <div class="faq">${FAQ.map(([q, a], i) => `<details class="reveal" style="--d:${i * 0.05}s"><summary><span class="no">${String(i + 1).padStart(2, "0")}</span>${esc(q)}<i></i></summary><p>${esc(a)}</p></details>`).join("")}</div>
-    </section>
-
-    <section class="stars-sec" id="stars">
-      <div class="sky"></div>
-      <div class="stars-bg" aria-hidden="true">${Array.from({ length: 50 }, (_, i) => `<i style="left:${(i * 37.3) % 100}%;top:${(i * 61.7) % 70}%;--d:${(i % 9) * 0.4}s;--s:${1 + (i % 3)}px"></i>`).join("")}</div>
-      ${cloud("c9")}${cloud("c10")}
-      <div class="stars-head reveal"><div class="kicker">${stars.length} созвездий · ${PRODUCTS.length} вещей</div><h2>Найдите свою ${SCRIPT("звезду")}</h2></div>
-      <div class="constel">
-        <svg class="c-lines" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${LINKS.filter(([a, b]) => stars[a] && stars[b]).map(([a, b]) => `<line x1="${stars[a].x}" y1="${stars[a].y}" x2="${stars[b].x}" y2="${stars[b].y}" pathLength="1"/>`).join("")}</svg>
-        ${stars.map((s, i) => `<a class="star" href="#/catalog?cat=${s.cat}" style="left:${s.x}%;top:${s.y}%;--d:${(i * 0.12).toFixed(2)}s">
-          <i class="dot"></i><span class="lbl">${esc(CATS[s.cat].title)} <small>${s.n}</small></span>
-          ${s.p ? `<span class="peek">${img(pimg(s.p), s.p.name)}<span>${esc(s.p.brandName)} · ${fmt(priceOf(s.p))}</span></span>` : ""}
-        </a>`).join("")}
-      </div>
-      <div class="stars-list">${stars.map((s) => `<a class="chip chip--sky" href="#/catalog?cat=${s.cat}">✦ ${esc(CATS[s.cat].title)} <small>${s.n}</small></a>`).join("")}</div>
-    </section>
-
     ${mixed.length ? `<section class="section fresh">
       <div class="section-head reveal"><div><div class="kicker">Только что приехало</div><h2 class="h-2">Новинки ${SCRIPT("сезона")}</h2></div><a href="#/catalog?sort=new" class="link">Все</a></div>
       <div class="rail">${mixed.map((p, i) => card(p, { d: (i % 4) * 0.06 })).join("")}</div>
     </section>` : ""}
 
-    <section class="finale">
-      <div class="sky"></div>${cloud("c11")}${cloud("c12")}${cloud("c13")}
-      <div class="finale-copy reveal"><div class="kicker">${esc(CFG.STORE_NAME)}</div><h2>Весь сад —<br>${SCRIPT("в каталоге")}</h2><a class="pill" href="#/catalog">Открыть каталог · ${PRODUCTS.length}</a></div>
+    <section class="faq-plain">
+      <div class="reveal"><div class="kicker">Вопросы</div><h2>Ещё <span class="script">вопросы</span></h2></div>
+      <div class="faq">${FAQ.map(([q, a], i) => `<details class="reveal" style="--d:${i * 0.05}s"><summary><span class="no">${String(i + 1).padStart(2, "0")}</span>${esc(q)}<i></i></summary><p>${esc(a)}</p></details>`).join("")}</div>
     </section>`;
   }
+
+  /* ---------- Движок фильма ---------- */
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const seg = (p, a, b) => clamp01((p - a) / (b - a));           // 0..1 внутри отрезка [a,b]
+  const ease = (t) => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const eOut = (t) => 1 - Math.pow(1 - t, 3);
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // Сцены: [вход, выход] в единицах прокрутки (1 единица = UNIT экрана)
+  const SC = { a: [0, 2.3], b: [1.9, 3.5], c: [3.0, 5.3], d: [4.9, 6.9], e: [6.5, 8.1], f: [7.7, 10.0], g: [9.5, 10.9], h: [10.4, 13] };
+  const FILM_LEN = 12.4, UNIT = 0.85;
 
   let homeCleanup = null;
   AFTER.home = () => {
     if (homeCleanup) homeCleanup();
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     document.body.classList.add("is-home");
-    const hero = $("#gHero");
-    let mx = 0, my = 0, raf = 0;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const film = $("#film"), stage = $("#stage");
+    if (!film) return;
+    film.style.height = `calc(${FILM_LEN * UNIT * 100}svh + 100svh)`;
+    const sc = Object.fromEntries($$(".sc", stage).map((el) => [el.dataset.sc, el]));
+    const q = (s) => $(s, stage);
+    const swaps = $$("#aSwap .sw", stage);
+    let target = 0, cur = 0, raf = 0, mx = 0, my = 0, smx = 0, smy = 0, alive = true, waveT = null, lastWaveOn = false;
+    const flags = new WeakMap();
+    const flag = (el, name, on) => { if (!el || flags.get(el) === on) return; flags.set(el, on); el.classList.toggle(name, on); };
 
-    function frame() {
-      raf = 0;
-      const y = scrollY, vh = innerHeight;
-      // параллакс облаков, статуй и флакона в герое
-      if (hero && y < vh * 1.3) {
-        $$(".g-hero .hc", hero).forEach((c) => { const k = parseFloat(getComputedStyle(c).getPropertyValue("--px")) || .2; c.style.translate = `${(mx * k * 30).toFixed(1)}px ${(y * k + my * k * 16).toFixed(1)}px`; });
-        const h = $(".halo-obj", hero); if (h) h.style.translate = `${(mx * -18).toFixed(1)}px ${(y * -.25 + my * -10).toFixed(1)}px`;
-        const st = $(".hero-statues", hero); if (st) st.style.translate = `${(mx * 8).toFixed(1)}px ${(y * .12).toFixed(1)}px`;
-        const cp = $(".g-copy", hero); if (cp) { cp.style.translate = `0 ${(y * .3).toFixed(1)}px`; cp.style.opacity = Math.max(0, 1 - y / (vh * .7)); }
-      }
-      // горизонтальная галерея
-      const hall = $("#hall"), track = $("#hallTrack");
-      if (hall && track && innerWidth >= 900) {
-        const r = hall.getBoundingClientRect(), total = r.height - vh;
-        const prog = Math.min(1, Math.max(0, -r.top / total));
-        const max = track.scrollWidth - innerWidth + 80;
-        track.style.transform = `translate3d(${(-prog * max).toFixed(1)}px,0,0)`;
-        const bar = $("#hallBar"); if (bar) bar.style.transform = `scaleX(${prog})`;
-        $$(".exhibit", track).forEach((ex) => { const b = ex.getBoundingClientRect(); const c = (b.left + b.width / 2) / innerWidth - .5; ex.style.setProperty("--c", c.toFixed(3)); });
-      } else if (track) track.style.transform = "";
+    function readTarget() {
+      const r = film.getBoundingClientRect(), total = film.offsetHeight - innerHeight;
+      target = clamp01(-r.top / total) * FILM_LEN;
     }
-    const req = () => { if (!raf && !reduce) raf = requestAnimationFrame(frame); };
-    const onMove = (e) => { mx = (e.clientX / innerWidth - .5) * 2; my = (e.clientY / innerHeight - .5) * 2; req(); };
-    if (matchMedia("(hover: hover)").matches) addEventListener("mousemove", onMove, { passive: true });
-    addEventListener("scroll", req, { passive: true }); addEventListener("resize", req);
-    if (!reduce) frame();
+    function wave(on) {
+      if (on === lastWaveOn) return; lastWaveOn = on;
+      const map = document.getElementById("waveMap"), turb = document.getElementById("waveTurb"); if (!map) return;
+      cancelAnimationFrame(waveT);
+      const t0 = performance.now(), from = on ? 90 : 0, to = on ? 0 : 60, dur = on ? 1600 : 500;
+      const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = eOut(k); map.setAttribute("scale", (from + (to - from) * e).toFixed(1)); turb.setAttribute("baseFrequency", `${(0.012 + (1 - e) * 0.01).toFixed(4)} ${(0.08 - e * 0.04).toFixed(3)}`); if (k < 1 && alive) waveT = requestAnimationFrame(step); };
+      waveT = requestAnimationFrame(step);
+    }
 
-    const st = $("#stars");
-    const so = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { st.classList.add("lit"); so.disconnect(); } }), { threshold: .25 });
-    if (st) so.observe(st);
+    function render(p) {
+      const vis = (k) => p >= SC[k][0] - .05 && p <= SC[k][1] + .05;
+      for (const k in sc) sc[k].style.visibility = vis(k) ? "visible" : "hidden";
+
+      /* --- A --- */
+      if (vis("a")) {
+        const tilt = ease(seg(p, 0, .7));                       // камера опускается с неба к статуям
+        const zoom = ease(seg(p, 1.35, 2.3));                    // наезд на флакон
+        const cam = q("#camA");
+        cam.style.transform = `translate3d(${(-smx * 10).toFixed(1)}px, ${(-smy * 6).toFixed(1)}px, 0) scale(${(1 + zoom * zoom * 6).toFixed(3)})`;
+        sc.a.classList.toggle("zooming", zoom > .02);
+        q(".a-figs").style.transform = `translateY(${lerp(34, 0, tilt).toFixed(2)}vh)`;
+        $$(".hc", cam).forEach((c, i) => { const front = c.classList.contains("a4"); c.style.translate = `${(smx * (i + 1) * 8).toFixed(1)}px ${(front ? p * 14 : p * (i + 1) * -5).toFixed(1)}vh`; });
+        const sw = p < .55 ? 0 : p < 1.05 ? 1 : 2;
+        swaps.forEach((s, i) => flag(s, "on", i === sw && p < 1.6));
+        q(".a-copy").style.opacity = 1 - seg(p, 1.3, 1.6);
+        q(".a-sub").style.opacity = 1 - seg(p, .3, .5);
+        q(".col-l").style.transform = `translateY(${lerp(0, -40, tilt)}vh)`;
+        sc.a.style.opacity = 1 - seg(p, 2.05, 2.3);
+      }
+      /* --- B: флакон крупно, затем разрез --- */
+      if (vis("b")) {
+        const inn = eOut(seg(p, 1.9, 2.4)), split = ease(seg(p, 2.85, 3.5));
+        sc.b.style.opacity = seg(p, 1.95, 2.25);
+        $$(".b-obj", sc.b).forEach((o) => { o.style.transform = `translate(-50%,-50%) scale(${lerp(2.4, 1, inn).toFixed(3)}) rotate(${lerp(-8, 0, inn) + split * 0}deg)`; o.style.filter = `blur(${((1 - inn) * 8).toFixed(1)}px) drop-shadow(0 30px 30px rgba(80,50,10,.3))`; });
+        q(".b-l").style.transform = `translateX(${(-split * 62).toFixed(2)}vw) rotate(${(-split * 6).toFixed(2)}deg)`;
+        q(".b-r").style.transform = `translateX(${(split * 62).toFixed(2)}vw) rotate(${(split * 6).toFixed(2)}deg)`;
+        $$(".b-copy", sc.b).forEach((c) => flag(c, "on", p > 2.25 && p < 2.95));
+        q(".b-note").style.opacity = seg(p, 2.3, 2.5) * (1 - seg(p, 2.8, 2.95));
+      }
+      /* --- C: небо, линии, растровая фигура --- */
+      if (vis("c")) {
+        sc.c.style.opacity = 1;
+        sc.c.style.zIndex = 1;
+        const lines = eOut(seg(p, 3.2, 3.8)), rise = eOut(seg(p, 3.55, 4.4)), paint = seg(p, 4.0, 4.8), out = ease(seg(p, 4.95, 5.3));
+        $$(".lv", sc.c).forEach((l) => { l.style.transform = `scaleY(${lines})`; });
+        $$(".lh", sc.c).forEach((l) => { l.style.transform = `scaleX(${lines})`; });
+        const g = q("#cGiant");
+        g.style.transform = `translate3d(${lerp(-20, 0, rise) + smx * -1.2}vw, ${lerp(70, 0, rise) - p * 0}vh, 0) scale(${lerp(1, 1.06, paint) + out * 1.5})`;
+        g.style.setProperty("--paint", (paint * 100).toFixed(1) + "%");
+        q(".c-copy").style.opacity = seg(p, 3.5, 3.8) * (1 - out);
+        $$(".c-copy .bt", sc.c).forEach((b) => flag(b, "on", p > 3.55 && p < 5.0));
+        $$(".c-notes > div", sc.c).forEach((d, i) => { d.style.opacity = seg(p, 3.8 + i * .12, 4.0 + i * .12); d.style.transform = `translateY(${(1 - seg(p, 3.8 + i * .12, 4.0 + i * .12)) * 20}px)`; });
+        $$(".hc", sc.c).forEach((c, i) => { c.style.translate = `${(p * (i ? -6 : 8)).toFixed(1)}vw ${(smy * 10).toFixed(1)}px`; });
+      }
+      /* --- D: пергамент, рама влетает --- */
+      if (vis("d")) {
+        const fly = eOut(seg(p, 4.95, 5.6)), wipe = ease(seg(p, 6.45, 6.9));
+        sc.d.style.opacity = seg(p, 4.95, 5.2);
+        const f = q("#dFrame");
+        f.style.transform = `translate3d(${lerp(30, 0, fly) + smx * 1}vw, ${lerp(-40, 0, fly)}vh, 0) scale(${lerp(.15, 1, fly) * (1 + seg(p, 5.6, 6.6) * .08)}) rotate(${lerp(-24, -2, fly)}deg)`;
+        f.style.filter = `blur(${((1 - fly) * 14).toFixed(1)}px)`;
+        q(".d-copy").style.opacity = seg(p, 5.35, 5.6);
+        wave(p > 5.35 && p < 6.6);
+        q(".d-wipe").style.transform = `translateY(${(1 - wipe) * 100}%)`;
+      }
+      /* --- E: небо со статуей --- */
+      if (vis("e")) {
+        const inn = eOut(seg(p, 6.6, 7.2)), flare = seg(p, 7.6, 8.1);
+        sc.e.style.opacity = seg(p, 6.7, 6.9);
+        const fig = q(".e-fig"); if (fig) fig.style.transform = `translate3d(${smx * -12}px, ${lerp(24, 0, inn)}vh, 0)`;
+        q(".e-drape").style.transform = `translate3d(${lerp(30, 0, inn)}vw, ${lerp(-20, 0, inn)}vh, 0) rotate(-8deg)`;
+        $$(".e-copy .bt, .e-copy .bt-s", sc.e).forEach((b) => flag(b, "on", p > 6.9 && p < 7.7));
+        q(".e-copy p").style.opacity = seg(p, 7.0, 7.2) * (1 - seg(p, 7.55, 7.7));
+        const fl = q("#eFlare"); fl.style.opacity = Math.sin(flare * Math.PI); fl.style.transform = `translate(-50%,-50%) scale(${lerp(.3, 3, flare)})`;
+        sc.e.style.filter = `brightness(${1 + Math.sin(flare * Math.PI) * .25})`;
+      }
+      /* --- F: кольцо флаконов --- */
+      if (vis("f")) {
+        const back = eOut(seg(p, 7.75, 8.6)), scatter = ease(seg(p, 9.4, 10.0));
+        sc.f.style.opacity = seg(p, 7.75, 7.95);
+        const r = q("#fRing");
+        r.style.transform = `translate(-50%,-50%) scale(${lerp(3.2, 1, back) + scatter * 2.6}) rotate(${(p - 7.7) * 22}deg)`;
+        r.style.opacity = 1 - seg(p, 9.6, 10.0);
+        $$(".f-b", r).forEach((b) => { b.style.rotate = `${-(p - 7.7) * 22}deg`; });
+        const t = q(".f-title"); t.style.transform = `translate(-50%,-50%) scale(${lerp(.7, 1, back)})`;
+        $$(".f-title .bt, .f-title .bt-s", sc.f).forEach((b) => flag(b, "on", p > 8.25 && p < 9.5));
+        $$(".qa", sc.f).forEach((d, i) => { const k = seg(p, 8.55 + i * .18, 8.8 + i * .18) * (1 - seg(p, 9.35, 9.55)); d.style.opacity = k; d.style.setProperty("--draw", k); });
+      }
+      /* --- G: пролёт сквозь облака --- */
+      if (vis("g")) {
+        const t = seg(p, 9.5, 10.9);
+        sc.g.style.opacity = Math.min(1, seg(p, 9.5, 9.8) * 1.2) * (1 - seg(p, 10.6, 10.9));
+        $$(".hc", sc.g).forEach((c, i) => {
+          const z = clamp01(t * 1.25 - i * .06), s = .4 + z * z * 7;
+          c.style.transform = `translate(-50%,-50%) translate(${(z * z * 1.3) * parseFloat(c.style.getPropertyValue("--gx"))}vw, ${(z * z * 1.3) * parseFloat(c.style.getPropertyValue("--gy"))}vh) scale(${s.toFixed(3)})`;
+          c.style.opacity = Math.min(1, z * 4) * (1 - seg(z, .75, 1));
+        });
+      }
+      /* --- H: созвездие --- */
+      if (vis("h")) {
+        sc.h.style.opacity = seg(p, 10.45, 10.75);
+        const draw = seg(p, 10.8, 11.6), card = eOut(seg(p, 11.3, 11.7)), rise = seg(p, 11.9, 12.4);
+        $$(".c-lines line", sc.h).forEach((l, i, arr) => { l.style.strokeDashoffset = 1 - clamp01(draw * arr.length * .6 - i * .5); });
+        $$(".star", sc.h).forEach((s, i, arr) => { const k = clamp01(draw * arr.length * .7 - i * .55); s.style.opacity = k; s.style.transform = `translate(-50%,-50%) scale(${lerp(.3, 1, eOut(k))})`; });
+        const c = q(".h-card"); c.style.opacity = card; c.style.transform = `translateY(${(1 - card) * 30}px)`;
+        const hf = q(".h-fig"); if (hf) hf.style.transform = `translate3d(${lerp(-20, 0, eOut(seg(p, 10.6, 11.2)))}vw, ${rise * -6}vh, 0)`;
+        $$(":scope > .hc", sc.h).forEach((cl, i) => { cl.style.translate = `0 ${lerp(40, -10, rise) + i * 4}vh`; });
+      }
+      const bar = document.getElementById("filmBar"); if (bar) bar.style.transform = `scaleX(${(p / FILM_LEN).toFixed(4)})`;
+    }
+
+    function hallFrame() {
+      const hall = $("#hall"), track = $("#hallTrack");
+      if (!hall || !track) return;
+      if (innerWidth >= 900) {
+        const r = hall.getBoundingClientRect(), total = r.height - innerHeight;
+        if (r.bottom < -50 || r.top > innerHeight + 50) return;
+        const prog = clamp01(-r.top / total);
+        track.style.transform = `translate3d(${(-prog * (track.scrollWidth - innerWidth + 80)).toFixed(1)}px,0,0)`;
+        const bar = $("#hallBar"); if (bar) bar.style.transform = `scaleX(${prog})`;
+      } else track.style.transform = "";
+    }
+
+    function loop() {
+      raf = 0;
+      if (!alive) return;
+      readTarget();
+      cur += (target - cur) * (reduce ? 1 : .085);          // мягкая инерция
+      smx += (mx - smx) * .06; smy += (my - smy) * .06;
+      if (Math.abs(target - cur) < .0005) cur = target;
+      render(cur); hallFrame();
+      if (Math.abs(target - cur) > .0005 || Math.abs(mx - smx) > .001 || Math.abs(my - smy) > .001) raf = requestAnimationFrame(loop);
+    }
+    const kick = () => { if (!raf) raf = requestAnimationFrame(loop); };
+    const onMove = (e) => { mx = (e.clientX / innerWidth - .5) * 2; my = (e.clientY / innerHeight - .5) * 2; kick(); };
+    if (matchMedia("(hover: hover)").matches) addEventListener("mousemove", onMove, { passive: true });
+    addEventListener("scroll", kick, { passive: true }); addEventListener("resize", kick);
+    readTarget(); cur = target; render(cur); hallFrame();
+    // первая фраза появляется сразу
+    requestAnimationFrame(() => swaps[0] && swaps[0].classList.add("on"));
 
     homeCleanup = () => {
-      removeEventListener("scroll", req); removeEventListener("resize", req); removeEventListener("mousemove", onMove);
-      so.disconnect(); document.body.classList.remove("is-home"); homeCleanup = null;
+      alive = false; cancelAnimationFrame(raf); cancelAnimationFrame(waveT);
+      removeEventListener("scroll", kick); removeEventListener("resize", kick); removeEventListener("mousemove", onMove);
+      document.body.classList.remove("is-home"); homeCleanup = null;
     };
   };
   AFTER.leave = () => { if (homeCleanup) homeCleanup(); };
