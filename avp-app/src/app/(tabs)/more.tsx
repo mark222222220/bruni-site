@@ -61,7 +61,6 @@ export default function More() {
       <Section>Профиль</Section>
       <List>
         <Item first title={s.name} sub={ROLES[s.role].about} right={<Pill text={ROLES[s.role].name} tone="accent" />} onPress={auth.required ? undefined : () => router.push('/role')} />
-        {auth.required ? <Item title="Звонки и видеосовещание" sub="Позвонить сотруднику, FaceTime, собрать встречу" onPress={() => router.push('/team')} /> : null}
         {auth.required && s.role === 'boss' ? <Item title="Сотрудники" sub="Добавить человека, выдать логин и пароль" onPress={() => router.push('/staff')} /> : null}
         <Item title="База данных" sub={kind === 'cloud' ? 'Закрытая: данные завода видит только команда' : 'Демо: данные только на этом телефоне'} right={<Pill text={kind === 'cloud' ? 'закрытая' : 'демо'} tone={kind === 'cloud' ? 'ok' : 'warn'} />} />
         {auth.required ? <Item title="Выйти" sub="на этом телефоне" onPress={auth.signOut} /> : null}

@@ -69,10 +69,3 @@ begin
   begin alter publication supabase_realtime add table public.factory_snapshot; exception when duplicate_object then null; end;
 end $$;
 
-
--- ---------- телефоны сотрудников (звонки и FaceTime из приложения) ----------
-alter table public.profiles add column if not exists phone text not null default '' check (char_length(phone) <= 20);
-revoke update on public.profiles from authenticated;
-grant update (phone) on public.profiles to authenticated;
-drop policy if exists "profiles: update own phone" on public.profiles;
-create policy "profiles: update own phone" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());

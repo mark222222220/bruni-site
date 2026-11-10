@@ -1,31 +1,11 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { FlatList, Keyboard, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Fill, Glass, Icon, IconButton, Screen, T, styles } from '@/components/ui';
-import { MEET_RE } from '@/lib/team';
+import { Avatar, Fill, Glass, Icon, Screen, T, styles } from '@/components/ui';
 import { useData } from '@/lib/data';
 import { useSettings } from '@/lib/settings';
 import { CHANNELS, ROLES, type Message } from '@/lib/types';
-
-function JoinButton({ url, dark }: { url: string; dark?: boolean }) {
-  const { t, tap } = useSettings();
-  return (
-    <Pressable
-      onPress={() => {
-        tap('success');
-        Linking.openURL(url).catch(() => {});
-      }}
-      accessibilityRole="button"
-      style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: dark ? 'rgba(17,17,19,0.85)' : t.accent }}
-    >
-      <Icon name="video" size={18} color={dark ? t.accent2 : t.onAccent} />
-      <T v="b" style={{ color: dark ? t.accent2 : t.onAccent, fontSize: 14 }}>
-        Присоединиться
-      </T>
-    </Pressable>
-  );
-}
 
 export default function Chat() {
   const params = useLocalSearchParams<{ ch?: string; q?: string }>();
@@ -84,9 +64,8 @@ export default function Chat() {
             <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
             {m.quote ? <T v="small" style={{ color: t.onAccent, opacity: 0.75, borderLeftWidth: 3, borderLeftColor: t.onAccent, paddingLeft: 8 }}>{m.quote}</T> : null}
             <T v="body" style={{ color: t.onAccent }} selectable>
-              {m.text.replace(MEET_RE, '').trim()}
+              {m.text}
             </T>
-            {MEET_RE.test(m.text) ? <JoinButton url={m.text.match(MEET_RE)![0]} dark /> : null}
             <T v="small" style={{ color: t.onAccent, opacity: 0.7, fontSize: 11, alignSelf: 'flex-end' }}>
               {new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
             </T>
@@ -103,9 +82,8 @@ export default function Chat() {
               </T>
               {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
               <T v="body" selectable>
-                {m.text.replace(MEET_RE, '').trim()}
+                {m.text}
               </T>
-              {MEET_RE.test(m.text) ? <JoinButton url={m.text.match(MEET_RE)![0]} /> : null}
             </Glass>
           </View>
         )}
@@ -114,7 +92,7 @@ export default function Chat() {
   };
 
   return (
-    <Screen compact={kb} right={kind === 'cloud' ? <IconButton icon="phone" label="Звонки и видеосовещание" onPress={() => router.push('/team')} /> : undefined} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
+    <Screen compact={kb} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>

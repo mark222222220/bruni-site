@@ -24,7 +24,7 @@ import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '0.6.0';
+export const APP_BUILD = '0.5.1';
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 
@@ -441,9 +441,6 @@ const PATHS: Record<string, string[]> = {
   cal: ['M3 10h18M8 3v4M16 3v4'],
   flame: ['M12 3c3 4 6 6 6 10a6 6 0 0 1-12 0c0-3 2-4 3-7 1 2 2 3 3 3 0-2-1-4 0-6z'],
   bolt: ['M13 2L4 14h7l-1 8 9-12h-7z'],
-  phone: ['M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2z'],
-  video: ['M3 7h12v10H3z', 'M15 10l6-3v10l-6-3'],
-  team: ['M2 21a6 6 0 0 1 12 0', 'M15 21a5 5 0 0 1 7-4.6', 'M18 7a3 3 0 1 1 0 .1'],
 };
 export function Icon({ name, size = 22, color, stroke = 1.9 }: { name: string; size?: number; color?: string; stroke?: number }) {
   const { t } = useSettings();
@@ -455,7 +452,6 @@ export function Icon({ name, size = 22, color, stroke = 1.9 }: { name: string; s
       {name === 'search' && <Circle cx={11} cy={11} r={7} {...p} />}
       {name === 'settings' && <Circle cx={12} cy={12} r={4} {...p} />}
       {name === 'user' && <Circle cx={12} cy={8} r={4} {...p} />}
-      {name === 'team' && <Circle cx={8} cy={8} r={4} {...p} />}
       {(PATHS[name] ?? []).map((d, i) => (
         <Path key={i} d={d} {...p} />
       ))}
