@@ -77,3 +77,10 @@ revoke update on public.profiles from authenticated;
 grant update (push_token) on public.profiles to authenticated;
 drop policy if exists "profiles: update own" on public.profiles;
 create policy "profiles: update own" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+
+-- ---------- правка своих сообщений ----------
+alter table public.messages add column if not exists edited_at bigint;
+revoke update on public.messages from authenticated;
+grant update (text, edited_at) on public.messages to authenticated;
+drop policy if exists "messages: edit own" on public.messages;
+create policy "messages: edit own" on public.messages for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());

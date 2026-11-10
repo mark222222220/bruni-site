@@ -17,6 +17,8 @@ type Ctx = State & {
   patch: <K extends TableName>(table: K, id: string, fields: Partial<Tables[K]>) => Promise<boolean>;
   remove: (table: TableName, id: string) => Promise<boolean>;
   send: (channel: string, text: string, quote?: string | null) => Promise<boolean>;
+  editMessage: (id: string, text: string) => Promise<boolean>;
+  deleteMessage: (id: string) => Promise<boolean>;
   resetDemo: () => Promise<void>;
   reload: () => Promise<void>;
 };
@@ -104,11 +106,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [upsert, s.name, s.role, backend.kind],
   );
+  const editMessage = useCallback((id: string, text: string) => patch('messages', id, { text: text.trim(), editedAt: Date.now() }), [patch]);
+  const deleteMessage = useCallback((id: string) => remove('messages', id), [remove]);
   const resetDemo = useCallback(async () => {
     if (backend.resetDemo) setSt({ snap: await backend.resetDemo(), loading: false, error: null });
   }, [backend]);
 
-  const value = useMemo(() => ({ ...st, kind: backend.kind, upsert, patch, remove, send, resetDemo, reload }), [st, backend.kind, upsert, patch, remove, send, resetDemo, reload]);
+  const value = useMemo(() => ({ ...st, kind: backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload }), [st, backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload]);
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }
 

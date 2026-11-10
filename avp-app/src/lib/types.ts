@@ -83,6 +83,10 @@ export type Message = {
   quote?: string | null;
   /** ms since epoch */
   at: number;
+  /** автор в базе (для права на правку и удаление) */
+  userId?: string;
+  /** когда изменено, ms */
+  editedAt?: number | null;
 };
 
 export type Tables = {

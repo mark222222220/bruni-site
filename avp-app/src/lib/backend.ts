@@ -74,9 +74,19 @@ export function localBackend(): Backend {
 /* ---------- закрытая база Supabase: вся команда ---------- */
 export function cloudBackend(sb: SupabaseClient): Backend {
   const fetchMessages = async (): Promise<Message[]> => {
-    const { data, error } = await sb.from('messages').select('id,channel,author,role,text,quote,at').order('at', { ascending: false }).limit(300);
+    const { data, error } = await sb.from('messages').select('*').order('at', { ascending: false }).limit(300);
     if (error) throw error;
-    return (data ?? []) as Message[];
+    return ((data ?? []) as (Message & { user_id?: string; edited_at?: number | null })[]).map((m) => ({
+      id: m.id,
+      channel: m.channel,
+      author: m.author,
+      role: m.role,
+      text: m.text,
+      quote: m.quote,
+      at: Number(m.at),
+      userId: m.user_id,
+      editedAt: m.edited_at ? Number(m.edited_at) : null,
+    }));
   };
   const fetchSheets = async () => {
     const { data, error } = await sb.from('factory_snapshot').select('section,data,updated_at');
@@ -130,7 +140,12 @@ export function cloudBackend(sb: SupabaseClient): Backend {
       const { error } = await sb.from('messages').insert({ id: m.id, channel: m.channel, author: m.author, role: m.role, text: m.text, quote: m.quote ?? null, at: m.at });
       if (error) throw error;
     },
-    async patch() {},
+    async patch(table, id, fields) {
+      if (table !== 'messages') return;
+      const f = fields as Partial<Message>;
+      const { error } = await sb.from('messages').update({ text: f.text, edited_at: f.editedAt ?? Date.now() }).eq('id', id);
+      if (error) throw error;
+    },
     async remove(table, id) {
       if (table !== 'messages') return;
       const { error } = await sb.from('messages').delete().eq('id', id);
