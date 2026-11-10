@@ -13,6 +13,8 @@ export type Settings = {
   big: boolean;
   haptics: boolean;
   badges: boolean;
+  /** уведомления о новых сообщениях в чате */
+  notify: boolean;
   thr: number;
   name: string;
   role: Role;
@@ -26,6 +28,7 @@ export const DEFAULTS: Settings = {
   big: false,
   haptics: true,
   badges: true,
+  notify: true,
   thr: 15,
   name: '',
   role: 'boss',

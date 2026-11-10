@@ -79,6 +79,7 @@ export default function Settings() {
         <Item first title="Крупный текст" sub="для чтения в цеху" right={<Toggle label="Крупный текст" value={s.big} onChange={(v) => set({ big: v })} />} />
         <Item title="Вибрация при нажатиях" sub="лёгкий отклик кнопок" right={<Toggle label="Вибрация" value={s.haptics} onChange={(v) => set({ haptics: v })} />} />
         <Item title="Счётчик непрочитанных" sub="цифра на вкладке «Чаты»" right={<Toggle label="Счётчик" value={s.badges} onChange={(v) => set({ badges: v })} />} />
+        <Item title="Уведомления о сообщениях" sub="на экран телефона, даже когда AVP закрыт" right={<Toggle label="Уведомления" value={s.notify} onChange={(v) => set({ notify: v })} />} />
       </List>
 
       <Section>Маржа</Section>

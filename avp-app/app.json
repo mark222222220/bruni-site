@@ -40,7 +40,8 @@
           "asyncRoutes": false
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": false

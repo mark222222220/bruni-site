@@ -69,3 +69,11 @@ begin
   begin alter publication supabase_realtime add table public.factory_snapshot; exception when duplicate_object then null; end;
 end $$;
 
+
+-- ---------- уведомления на телефон ----------
+-- каждый телефон хранит свой адрес уведомлений; менять можно только свой
+alter table public.profiles add column if not exists push_token text not null default '';
+revoke update on public.profiles from authenticated;
+grant update (push_token) on public.profiles to authenticated;
+drop policy if exists "profiles: update own" on public.profiles;
+create policy "profiles: update own" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());

@@ -3,6 +3,8 @@ import { makeBackend, type Backend } from './backend';
 import { BALANCE } from './demo';
 import { addDays, dm, fmt, money, today, tomorrow, uid } from './format';
 import { getSheets, setSheets, tablesFromSheets, useSheets } from './sheets';
+import { notifyTeamAboutMessage } from './notifications';
+import { supabase } from './supabase';
 import { useSettings } from './settings';
 import { STATUSES, type Snapshot, type TableName, type Tables } from './types';
 
@@ -92,9 +94,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [backend, run],
   );
   const send = useCallback(
-    (channel: string, text: string, quote?: string | null) =>
-      upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now() }),
-    [upsert, s.name, s.role],
+    async (channel: string, text: string, quote?: string | null) => {
+      const ok = await upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now() });
+      // коллегам — уведомление на телефон
+      if (ok && backend.kind === 'cloud' && supabase) {
+        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim()));
+      }
+      return ok;
+    },
+    [upsert, s.name, s.role, backend.kind],
   );
   const resetDemo = useCallback(async () => {
     if (backend.resetDemo) setSt({ snap: await backend.resetDemo(), loading: false, error: null });

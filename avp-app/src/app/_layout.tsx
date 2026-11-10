@@ -6,6 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { NotificationsBridge } from '@/lib/notifications';
 import { DataProvider } from '@/lib/data';
 import { SettingsProvider, useSettings } from '@/lib/settings';
 
@@ -26,6 +27,7 @@ function Root() {
   if (!auth.required && !s.name) return <Onboarding />;
   return (
     <DataProvider>
+      {auth.required ? <NotificationsBridge /> : null}
       <StatusBar style={t.dark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
         <Stack.Screen name="(tabs)" />
