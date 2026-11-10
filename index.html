@@ -10,108 +10,135 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;800;900&family=Mr+Dafoe&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
 :root{
-  --y:#ffd400; --y2:#ffe45c; --k:#0b0b0c; --k2:#1a1a1d; --w:#fff;
-  --pink:#ff3d8b; --blue:#2f6bff; --green:#21d07a; --orange:#ff6a1a; --violet:#9a5cff;
+  --y:#ffd400; --k:#0b0b0c; --w:#fff;
+  --pink:#ff3d8b; --blue:#2f6bff; --green:#21d07a; --orange:#ff6a1a; --violet:#9a5cff; --sky:#5ec8ff; --lilac:#d7a6ff;
+  --v:0; /* scroll velocity, set by JS */
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
 body{background:var(--y);color:var(--k);font-family:"Inter Tight",system-ui,sans-serif;overflow-x:hidden;cursor:none}
 a{color:inherit;text-decoration:none}
 ::selection{background:var(--k);color:var(--y)}
 .mono{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+section{position:relative}
 
-/* ---------- cursor ---------- */
-#cursor{position:fixed;left:0;top:0;width:14px;height:14px;border-radius:50%;background:var(--k);pointer-events:none;z-index:100;transform:translate(-50%,-50%);transition:width .25s,height .25s,background .25s;mix-blend-mode:normal}
-#cursor.big{width:64px;height:64px;background:rgba(11,11,12,.15);border:1.5px solid var(--k)}
-.dark #cursor{background:var(--y)}
+/* ---------- ink trail canvas (main effect) ---------- */
+#ink{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}
+#cursor{position:fixed;left:0;top:0;width:12px;height:12px;border-radius:50%;background:var(--k);pointer-events:none;z-index:100;transform:translate(-50%,-50%);transition:width .25s,height .25s,background .25s,border .25s}
+#cursor.big{width:58px;height:58px;background:transparent;border:1.5px solid var(--k)}
+body.dark #cursor{background:var(--y)} body.dark #cursor.big{background:transparent;border-color:var(--y)}
 @media (hover:none){body{cursor:auto}#cursor{display:none}}
 
+/* velocity-reactive type: skew + RGB split */
+.vel{transform:skewY(calc(var(--v) * .045deg));text-shadow:calc(var(--v) * .09px) 0 rgba(255,0,90,.75),calc(var(--v) * -.09px) 0 rgba(0,220,255,.75);will-change:transform}
+
 /* ---------- nav ---------- */
-nav{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;padding:18px 28px;z-index:50;pointer-events:none}
+nav{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;padding:18px 28px;z-index:50;pointer-events:none;transition:color .3s}
 nav>*{pointer-events:auto}
 .logo-x{font-size:26px;font-weight:900;line-height:1;display:flex;gap:10px;align-items:center}
+.logo-x b{display:inline-block;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.logo-x:hover b{transform:rotate(180deg)}
 .logo-x span{font-size:12px;font-weight:800;letter-spacing:.1em}
 .pills{display:flex;gap:6px}
-.pill{border:1.5px solid var(--k);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;background:var(--y);transition:.2s}
+.pill{border:1.5px solid currentColor;border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;background:var(--y);transition:.25s}
 .pill:hover{background:var(--k);color:var(--y)}
-.badge{position:absolute;left:50%;top:18px;transform:translateX(-50%);border:1.5px solid var(--k);border-radius:99px;padding:5px 12px;font-weight:800;font-size:12px;background:var(--y)}
-nav.inv .pill,nav.inv .badge{background:var(--k);color:var(--y);border-color:var(--y)}
-nav.inv{color:var(--y)}
-
-/* ---------- goo layer ---------- */
-.goo{position:absolute;inset:0;filter:url(#goo);pointer-events:none;overflow:hidden}
-.goo i{position:absolute;left:0;top:0;border-radius:50%;background:var(--k);will-change:transform}
+.badge{position:absolute;left:50%;top:18px;transform:translateX(-50%);border:1.5px solid currentColor;border-radius:99px;padding:5px 12px;font-weight:800;font-size:12px;background:var(--y)}
+nav.inv{color:var(--y)} nav.inv .pill,nav.inv .badge{background:var(--k)}
+nav.inv .pill:hover{background:var(--y);color:var(--k)}
 
 /* ---------- hero ---------- */
-.hero{position:relative;height:100vh;min-height:640px;overflow:hidden}
+.hero{height:100vh;min-height:640px;overflow:hidden}
 .wordmark{position:absolute;left:4vw;top:11vh;line-height:.8}
-.wordmark h1{position:relative;z-index:2;font-weight:900;font-size:min(23vw,330px);letter-spacing:-.06em}
-.wordmark .script{position:absolute;right:-12vw;top:42%;font-family:"Mr Dafoe",cursive;font-size:min(17vw,250px);color:var(--k);transform:rotate(-8deg);z-index:4;white-space:nowrap;pointer-events:none}
-.tag{position:absolute;left:4.4vw;top:calc(11vh + min(19vw,275px));font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;z-index:2}
+.wordmark h1{position:relative;z-index:2;font-weight:900;font-size:min(23vw,330px);letter-spacing:-.06em;display:flex}
+.wordmark h1 span{display:inline-block;transform:translateY(110%) rotate(8deg);animation:rise 1s cubic-bezier(.2,.9,.2,1) forwards}
+.wordmark h1 .mask{overflow:hidden;display:flex;padding-bottom:.04em}
+@keyframes rise{to{transform:none}}
+.wordmark .script{position:absolute;right:-12vw;top:42%;font-family:"Mr Dafoe",cursive;font-size:min(17vw,250px);transform:rotate(-8deg);z-index:6;white-space:nowrap;pointer-events:none;clip-path:inset(0 100% 0 0);animation:write 1.4s .9s cubic-bezier(.6,.1,.2,1) forwards}
+@keyframes write{to{clip-path:inset(0 -10% 0 0)}}
+.tag{position:absolute;left:4.4vw;top:calc(11vh + min(19vw,275px));font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;z-index:2;opacity:0;animation:fade .8s 1.4s forwards}
+@keyframes fade{to{opacity:1}}
 .hero-foot{position:absolute;left:28px;right:28px;bottom:22px;display:flex;justify-content:space-between;align-items:end;z-index:3}
 .scroll-ind{width:22px;height:36px;border:1.5px solid var(--k);border-radius:12px;position:relative}
 .scroll-ind:after{content:"";position:absolute;left:50%;top:7px;width:4px;height:7px;border-radius:2px;background:var(--k);transform:translateX(-50%);animation:sc 1.6s infinite}
 @keyframes sc{0%{opacity:0;transform:translate(-50%,0)}40%{opacity:1}100%{opacity:0;transform:translate(-50%,12px)}}
+.hint{position:absolute;right:28px;top:50%;writing-mode:vertical-rl;z-index:3;opacity:.6}
 
-.stage{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);perspective:1200px;z-index:3}
+.stage{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);perspective:1200px;z-index:4}
+.drop{animation:drop 1.6s .3s cubic-bezier(.2,.9,.25,1.15) both}
+@keyframes drop{from{transform:translateY(-120vh) rotate(-40deg)}}
 .float{animation:float 6s ease-in-out infinite}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
-.tilt{transform-style:preserve-3d;transition:transform .15s linear}
+.tilt{transform-style:preserve-3d}
 
 /* ---------- phone ---------- */
-.phone{position:relative;width:230px;height:470px;border-radius:44px;background:linear-gradient(135deg,#d9d9de,#6d6d75 40%,#f2f2f5 60%,#8a8a92);padding:9px;transform-style:preserve-3d;box-shadow:0 60px 80px -30px rgba(0,0,0,.55)}
-.phone:before{content:"";position:absolute;inset:0;border-radius:44px;transform:translateZ(-14px);background:#2a2a2f}
-.phone .scr{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:#000;transform:translateZ(1px)}
-.phone .island{position:absolute;top:12px;left:50%;width:84px;height:24px;border-radius:20px;background:#000;transform:translateX(-50%);z-index:3}
+.phone{position:relative;width:230px;height:470px;border-radius:44px;background:linear-gradient(135deg,#e4e4e8,#6d6d75 40%,#f6f6f8 60%,#8a8a92);padding:9px;transform-style:preserve-3d;box-shadow:0 60px 80px -30px rgba(0,0,0,.55)}
+.phone:before{content:"";position:absolute;inset:0;border-radius:44px;transform:translateZ(-16px);background:#2a2a2f}
+.phone:after{content:"";position:absolute;inset:0;border-radius:44px;transform:translateZ(-8px);background:#55555c}
+.scr{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:#000;transform:translateZ(1px)}
+.island{position:absolute;top:12px;left:50%;width:84px;height:24px;border-radius:20px;background:#000;transform:translateX(-50%);z-index:5}
 .holo{position:absolute;inset:-40%;background:conic-gradient(from 0deg,#ff3d8b,#ffd400,#21d07a,#2f6bff,#9a5cff,#ff3d8b);animation:spin 7s linear infinite;filter:blur(18px) saturate(1.4)}
-.holo2{position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.0) 0 14px,rgba(255,255,255,.28) 14px 16px);mix-blend-mode:overlay;animation:slide 3s linear infinite}
+.lines{position:absolute;inset:0;background:repeating-linear-gradient(115deg,transparent 0 14px,rgba(255,255,255,.3) 14px 16px);mix-blend-mode:overlay;animation:slide 2.4s linear infinite}
+.scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);z-index:3;pointer-events:none}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes slide{to{background-position:120px 0}}
-.ui{position:absolute;inset:0;z-index:2;color:#fff;padding:52px 18px 18px;display:flex;flex-direction:column;justify-content:space-between}
+/* glitch slices */
+.gl{position:absolute;inset:0;z-index:2;mix-blend-mode:screen;opacity:0}
+.gl .holo{filter:blur(6px) saturate(2) hue-rotate(90deg)}
+.gl.a{animation:glA 2.8s steps(1) infinite}
+.gl.b{animation:glB 2.8s steps(1) infinite}
+@keyframes glA{0%,78%,100%{opacity:0}80%{opacity:1;clip-path:inset(12% 0 70% 0);transform:translateX(-14px)}84%{opacity:1;clip-path:inset(55% 0 20% 0);transform:translateX(18px)}88%{opacity:1;clip-path:inset(30% 0 52% 0);transform:translateX(-8px)}92%{opacity:0}}
+@keyframes glB{0%,80%,100%{opacity:0}82%{opacity:.9;clip-path:inset(70% 0 8% 0);transform:translateX(12px);filter:hue-rotate(180deg)}86%{opacity:.9;clip-path:inset(5% 0 85% 0);transform:translateX(-20px)}90%{opacity:.9;clip-path:inset(40% 0 40% 0);transform:translateX(10px)}94%{opacity:0}}
+.ui{position:absolute;inset:0;z-index:4;color:#fff;padding:52px 18px 18px;display:flex;flex-direction:column;justify-content:space-between;animation:uiGl 2.8s steps(1) infinite}
+@keyframes uiGl{0%,79%,93%,100%{transform:none;text-shadow:none}81%{transform:translateX(4px);text-shadow:-3px 0 #ff004c,3px 0 #00e5ff}87%{transform:translateX(-5px);text-shadow:4px 0 #ff004c,-4px 0 #00e5ff}}
 .ui .time{font-size:58px;font-weight:900;letter-spacing:-.04em;line-height:1}
 .ui .date{font-size:13px;font-weight:600;opacity:.85}
 .ui .widgets{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .ui .wd{background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border-radius:16px;padding:10px;font-size:11px;font-weight:600}
 .ui .wd b{display:block;font-size:20px;font-weight:900}
-.glare{position:absolute;inset:0;border-radius:36px;background:linear-gradient(120deg,rgba(255,255,255,.35),transparent 40%);z-index:4;pointer-events:none}
-.cam{position:absolute;width:12px;height:12px;border-radius:50%;background:#111;box-shadow:inset 0 0 0 3px #333}
+.glare{position:absolute;inset:0;border-radius:36px;background:linear-gradient(120deg,rgba(255,255,255,.4),transparent 40%);z-index:6;pointer-events:none;transition:background-position .1s}
+
+/* ---------- liquid section edges ---------- */
+.edge{position:absolute;left:0;width:100%;height:180px;pointer-events:none;z-index:5;display:block}
+.edge.top{top:-179px}
+.edge.bottom{bottom:-179px;transform:scaleY(-1)}
 
 /* ---------- marquee ---------- */
-.ticker{background:var(--k);color:var(--y);overflow:hidden;white-space:nowrap;padding:14px 0;font-weight:900;font-size:28px;letter-spacing:-.02em;position:relative;z-index:4}
-.ticker div{display:inline-block;animation:mq 22s linear infinite}
+.ticker{background:var(--k);color:var(--y);overflow:hidden;white-space:nowrap;padding:14px 0;font-weight:900;font-size:28px;letter-spacing:-.02em;z-index:4}
+.ticker div{display:inline-block;will-change:transform}
 .ticker span{margin:0 26px}
 .ticker em{font-family:"Mr Dafoe";font-style:normal;font-weight:400;font-size:38px}
-@keyframes mq{to{transform:translateX(-50%)}}
 
 /* ---------- showcase (dark) ---------- */
-.show{background:var(--k);color:var(--w);position:relative;overflow:hidden;padding:120px 0 140px}
+.show{background:var(--k);color:var(--w);padding:120px 0 220px;perspective:1400px}
+.show-in{transform-origin:50% 0;will-change:transform}
 .show h2{font-size:min(11vw,150px);font-weight:900;letter-spacing:-.05em;line-height:.85;padding:0 4vw;color:var(--y)}
 .show h2 em{font-family:"Mr Dafoe";font-style:normal;font-weight:400;color:#fff;font-size:.8em}
 .show p.lead{max-width:440px;margin:24px 4vw 0;color:#aaa;font-size:15px;line-height:1.5}
-.deck{display:flex;gap:28px;padding:70px 4vw 0;perspective:1400px;width:max-content;will-change:transform}
-.card{width:340px;height:440px;border-radius:26px;position:relative;overflow:hidden;flex:none;transform:rotateY(-14deg) rotateX(6deg);transition:transform .5s cubic-bezier(.2,.8,.2,1);padding:24px;display:flex;flex-direction:column;justify-content:space-between}
-.card:hover{transform:rotateY(0) rotateX(0) translateY(-10px) scale(1.03)}
+.deck-wrap{overflow:hidden}
+.deck{display:flex;gap:28px;padding:70px 4vw 30px;perspective:1400px;width:max-content;will-change:transform}
+.card{width:340px;height:440px;border-radius:26px;position:relative;overflow:hidden;flex:none;transition:transform .6s cubic-bezier(.2,.8,.2,1);padding:24px;display:flex;flex-direction:column;justify-content:space-between;transform-style:preserve-3d}
+.card:hover{transform:rotateY(0) rotateX(0) translateY(-14px) scale(1.04)!important}
 .card h3{font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:.95;position:relative;z-index:2}
 .card .mono{position:relative;z-index:2}
-.card .art{position:relative;flex:1;display:grid;place-items:center;z-index:1}
-.c1{background:var(--green);color:var(--k)}
-.c2{background:var(--pink);color:var(--k)}
-.c3{background:var(--blue);color:#fff}
-.c4{background:var(--orange);color:var(--k)}
-.c5{background:var(--violet);color:#fff}
+.card .art{position:relative;flex:1;display:grid;place-items:center;z-index:1;transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.card:hover .art{transform:scale(1.12) rotate(-6deg)}
+.card .shine{position:absolute;inset:0;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.45),transparent 45%);opacity:0;transition:opacity .3s;z-index:3;pointer-events:none;mix-blend-mode:overlay}
+.card:hover .shine{opacity:1}
+.c1{background:var(--green);color:var(--k)} .c2{background:var(--pink);color:var(--k)} .c3{background:var(--blue);color:#fff} .c4{background:var(--orange);color:var(--k)} .c5{background:var(--violet);color:#fff}
 .price{display:flex;justify-content:space-between;align-items:end;position:relative;z-index:2}
 .price b{font-size:22px;font-weight:900}
-.btn{display:inline-flex;align-items:center;gap:8px;border-radius:99px;padding:10px 18px;font-weight:800;font-size:13px;background:var(--k);color:var(--y);border:0;cursor:none}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:99px;padding:10px 18px;font-weight:800;font-size:13px;background:var(--k);color:var(--y);border:0;cursor:none;transition:transform .2s}
+.btn:hover{transform:scale(1.07)}
 .btn.y{background:var(--y);color:var(--k)}
 
-/* ---------- mini devices (pure CSS) ---------- */
+/* ---------- mini devices ---------- */
 .d-laptop{width:230px;transform:rotateX(8deg)}
 .d-laptop .lid{height:145px;border-radius:12px 12px 4px 4px;background:#111;padding:8px;box-shadow:0 0 0 2px #444 inset}
-.d-laptop .lid div{height:100%;border-radius:6px;background:linear-gradient(160deg,#00e1ff,#2f6bff 45%,#9a5cff);position:relative;overflow:hidden}
+.d-laptop .lid div{height:100%;border-radius:6px;background:linear-gradient(160deg,#00e1ff,#2f6bff 45%,#9a5cff);background-size:200% 200%;animation:pan 4s ease-in-out infinite alternate;position:relative;overflow:hidden}
 .d-laptop .lid div:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.12) 0 2px,transparent 2px 5px)}
+@keyframes pan{to{background-position:100% 100%}}
 .d-laptop .base{height:12px;margin:0 -18px;border-radius:0 0 14px 14px;background:linear-gradient(#d6d6da,#8f8f96)}
-.d-pc{width:120px;height:220px;border-radius:12px;background:#111;border:3px solid #333;position:relative;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;box-shadow:0 30px 40px -20px #000}
-.fan{width:72px;height:72px;border-radius:50%;border:4px solid #222;background:conic-gradient(var(--pink),var(--y),var(--green),var(--blue),var(--violet),var(--pink));animation:spin 1.2s linear infinite;position:relative}
+.d-pc{width:120px;height:220px;border-radius:12px;background:#111;border:3px solid #333;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;box-shadow:0 30px 40px -20px #000}
+.fan{width:72px;height:72px;border-radius:50%;border:4px solid #222;background:conic-gradient(var(--pink),var(--y),var(--green),var(--blue),var(--violet),var(--pink));animation:spin 1.2s linear infinite;position:relative;box-shadow:0 0 24px rgba(255,61,139,.6)}
 .fan:after{content:"";position:absolute;inset:22px;border-radius:50%;background:#111}
 .d-watch{width:120px;height:140px;border-radius:34px;background:#111;border:5px solid #c9c9cf;display:grid;place-items:center;position:relative;color:#fff;font-weight:900;font-size:30px}
 .d-watch:before,.d-watch:after{content:"";position:absolute;left:18px;right:18px;height:70px;background:#1d1d20;z-index:-1;border-radius:10px}
@@ -120,65 +147,75 @@ nav.inv{color:var(--y)}
 .d-pods{display:flex;gap:16px}
 .d-pods i{width:46px;height:96px;border-radius:24px 24px 14px 14px;background:linear-gradient(145deg,#fff,#cfcfd6);position:relative;box-shadow:0 20px 30px -10px rgba(0,0,0,.4)}
 .d-pods i:after{content:"";position:absolute;left:11px;top:12px;width:24px;height:24px;border-radius:50%;background:#222}
-.d-hand{width:250px;height:120px;border-radius:60px;background:linear-gradient(145deg,rgba(255,255,255,.65),rgba(200,200,210,.35));border:2px solid rgba(255,255,255,.8);position:relative;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);box-shadow:0 30px 40px -18px rgba(0,0,0,.5)}
+.d-hand{width:250px;height:120px;border-radius:60px;background:linear-gradient(145deg,rgba(255,255,255,.7),rgba(200,200,210,.4));border:2px solid rgba(255,255,255,.85);position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 30px 40px -18px rgba(0,0,0,.5)}
 .d-hand .s{width:110px;height:72px;border-radius:8px;background:#000;overflow:hidden;position:relative}
 .d-hand .s .holo{filter:blur(10px)}
-.d-hand .dp{position:absolute;left:26px;width:34px;height:34px;background:
-  linear-gradient(#222,#222) center/12px 34px no-repeat,linear-gradient(#222,#222) center/34px 12px no-repeat}
+.d-hand .dp{position:absolute;left:26px;width:34px;height:34px;background:linear-gradient(#222,#222) center/12px 34px no-repeat,linear-gradient(#222,#222) center/34px 12px no-repeat}
 .d-hand .ab{position:absolute;right:24px;width:40px;height:40px}
 .d-hand .ab b{position:absolute;width:15px;height:15px;border-radius:50%;background:var(--pink)}
 .d-hand .ab b:nth-child(1){top:0;left:12px}.d-hand .ab b:nth-child(2){bottom:0;left:12px;background:var(--blue)}
 .d-hand .ab b:nth-child(3){left:0;top:12px;background:var(--green)}.d-hand .ab b:nth-child(4){right:0;top:12px;background:var(--y)}
 
 /* ---------- manifesto ---------- */
-.mani{position:relative;padding:150px 4vw 160px;overflow:hidden}
+.mani{padding:170px 4vw 180px;overflow:hidden}
 .mani .lbl{margin-bottom:24px}
 .mani p{font-size:min(6.2vw,84px);font-weight:900;line-height:.98;letter-spacing:-.04em;text-transform:uppercase;position:relative;z-index:2;max-width:1300px}
-.mani p span{opacity:.14;transition:opacity .3s}
-.mani p span.on{opacity:1}
-.shape{position:absolute;z-index:1;border-radius:46% 54% 40% 60%/55% 40% 60% 45%;animation:morph 10s ease-in-out infinite;mix-blend-mode:multiply;opacity:.9}
-@keyframes morph{0%,100%{border-radius:46% 54% 40% 60%/55% 40% 60% 45%;transform:rotate(0)}50%{border-radius:60% 40% 58% 42%/40% 60% 40% 60%;transform:rotate(25deg)}}
+.mani p span{display:inline-block;opacity:.12;transform:translateY(.25em) rotate(3deg);transition:opacity .4s,transform .6s cubic-bezier(.2,.9,.2,1)}
+.mani p span.on{opacity:1;transform:none}
+.shape{position:absolute;z-index:1;border-radius:46% 54% 40% 60%/55% 40% 60% 45%;animation:morph 10s ease-in-out infinite;mix-blend-mode:multiply;opacity:.9;will-change:transform}
+@keyframes morph{0%,100%{border-radius:46% 54% 40% 60%/55% 40% 60% 45%}50%{border-radius:60% 40% 58% 42%/40% 60% 40% 60%}}
 
-/* ---------- grid ---------- */
-.lab{padding:40px 4vw 140px;position:relative}
-.lab-head{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:50px}
+/* ---------- lab (color mosaic blob) ---------- */
+.lab{padding:40px 4vw 200px;overflow:hidden}
+.mosaic{position:absolute;left:0;top:0;width:900px;height:900px;z-index:0;pointer-events:none;will-change:transform,clip-path}
+.mosaic .cells{position:absolute;inset:-10%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);transform:rotate(-14deg)}
+.mosaic .cells i:nth-child(1){background:var(--k)}.mosaic .cells i:nth-child(2){background:var(--green)}.mosaic .cells i:nth-child(3){background:var(--orange)}
+.mosaic .cells i:nth-child(4){background:var(--sky)}.mosaic .cells i:nth-child(5){background:var(--lilac)}.mosaic .cells i:nth-child(6){background:var(--pink)}
+.mosaic .cells i:nth-child(7){background:var(--blue)}.mosaic .cells i:nth-child(8){background:var(--k)}.mosaic .cells i:nth-child(9){background:var(--green)}
+.lab-head{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:50px;position:relative;z-index:2}
 .lab-head h2{font-size:min(9vw,120px);font-weight:900;letter-spacing:-.05em;line-height:.85}
 .lab-head h2 em{font-family:"Mr Dafoe";font-style:normal;font-weight:400}
 .filters{display:flex;gap:6px;flex-wrap:wrap}
-.filters button{font:600 12px "Inter Tight";border:1.5px solid var(--k);background:transparent;border-radius:99px;padding:7px 14px;cursor:none}
-.filters button.act{background:var(--k);color:var(--y)}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
-.item{position:relative;height:380px;border-radius:24px;display:grid;place-items:center;transition:transform .4s cubic-bezier(.2,.8,.2,1),opacity .4s;perspective:900px}
-.item .dev{transition:transform .4s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
-.item:hover .dev{transform:translateY(-14px) rotate(-4deg) scale(1.06)}
-.item .meta{position:absolute;left:18px;bottom:16px;right:18px;display:flex;justify-content:space-between;align-items:end}
+.filters button{font:600 12px "Inter Tight";border:1.5px solid var(--k);background:var(--y);border-radius:99px;padding:7px 14px;cursor:none;transition:.2s}
+.filters button.act,.filters button:hover{background:var(--k);color:var(--y)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;position:relative;z-index:2}
+.item{position:relative;height:380px;border-radius:24px;display:grid;place-items:center;transition:opacity .4s,filter .4s}
+.item .dev{transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+.item:hover .dev{transform:translateY(-16px) rotate(-5deg) scale(1.08)}
+.item .fl{animation:float 5s ease-in-out infinite}
+.item:nth-child(2) .fl{animation-delay:-1.2s}.item:nth-child(3) .fl{animation-delay:-2.4s}.item:nth-child(4) .fl{animation-delay:-3.1s}.item:nth-child(5) .fl{animation-delay:-.6s}.item:nth-child(6) .fl{animation-delay:-4s}
+.item .meta{position:absolute;left:18px;bottom:16px;right:18px;display:flex;justify-content:space-between;align-items:end;background:var(--y);padding:8px 10px;border-radius:12px}
 .item .meta b{display:block;font-size:20px;font-weight:900;letter-spacing:-.02em}
-.item .num{position:absolute;left:18px;top:16px}
+.item .num{position:absolute;left:18px;top:16px;background:var(--y);padding:2px 6px;border-radius:6px}
 .item .new{position:absolute;right:16px;top:14px;background:var(--k);color:var(--y);border-radius:99px;padding:4px 10px;font-weight:800;font-size:11px}
-.item.hide{opacity:.12;transform:scale(.96)}
-.item:before{content:"";position:absolute;inset:0;border-radius:24px;border:1.5px dashed rgba(11,11,12,.25)}
-.reveal{opacity:0;transform:translateY(40px);transition:opacity .8s,transform .8s cubic-bezier(.2,.8,.2,1)}
+.item.hide{opacity:.1;filter:blur(3px)}
+.reveal{opacity:0;transform:translateY(60px) scale(.92);transition:opacity .9s,transform .9s cubic-bezier(.2,.8,.2,1)}
 .reveal.in{opacity:1;transform:none}
 
 /* ---------- reach out ---------- */
-.reach{background:var(--k);color:var(--y);position:relative;overflow:hidden;min-height:100vh;padding:120px 4vw 30px;display:flex;flex-direction:column;justify-content:space-between}
-.reach .goo i{background:var(--y)}
-.reach h2{font-size:min(19vw,290px);font-weight:900;letter-spacing:-.06em;line-height:.8;position:relative;z-index:2;mix-blend-mode:difference;color:var(--y)}
-.reach h2 em{font-family:"Mr Dafoe";font-weight:400;font-style:normal;letter-spacing:0;display:block;font-size:.6em;margin-left:20vw}
+.reach{background:var(--k);color:var(--y);overflow:visible;min-height:100vh;padding:120px 4vw 30px;display:flex;flex-direction:column;justify-content:space-between}
+.reach .blobbox{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.reach .big{position:absolute;width:46vw;height:46vw;max-width:640px;max-height:640px;left:30%;top:18%;background:var(--y);will-change:clip-path,transform}
+.reach h2{font-size:min(19vw,290px);font-weight:900;letter-spacing:-.06em;line-height:.8;position:relative;z-index:2;mix-blend-mode:difference;color:var(--y);display:flex;flex-wrap:wrap;align-items:center}
+.hw{position:relative}
+.reach .peace{position:absolute;left:min(26vw,380px);top:-.1em;font-size:min(11vw,170px);z-index:3;animation:peace 2.2s ease-in-out infinite;filter:grayscale(1) contrast(1.2) brightness(1.1) drop-shadow(0 20px 20px rgba(0,0,0,.5));pointer-events:none}
+@keyframes peace{0%,100%{transform:rotate(-12deg) translateY(0)}50%{transform:rotate(10deg) translateY(-14px)}}
+.reach h2 em{font-family:"Mr Dafoe";font-weight:400;font-style:normal;letter-spacing:0;display:block;width:100%;font-size:.6em;margin-left:20vw}
 .reach .row{display:flex;justify-content:space-between;align-items:end;gap:30px;flex-wrap:wrap;position:relative;z-index:2}
 .reach form{display:flex;gap:8px;flex-wrap:wrap}
-.reach input{font:600 15px "Inter Tight";background:transparent;border:1.5px solid var(--y);color:var(--y);border-radius:99px;padding:12px 18px;min-width:260px;outline:none;cursor:none}
+.reach input{font:600 15px "Inter Tight";background:var(--k);border:1.5px solid var(--y);color:var(--y);border-radius:99px;padding:12px 18px;min-width:260px;outline:none;cursor:none}
 .reach input::placeholder{color:rgba(255,212,0,.5)}
 .foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;border-top:1px solid rgba(255,212,0,.25);padding-top:18px;margin-top:60px;position:relative;z-index:2}
 .foot a:hover{text-decoration:underline}
-.dots{display:flex;gap:6px}.dots i{width:30px;height:12px;border-radius:8px;background:var(--y)}
+.dots{display:flex;gap:6px}.dots i{width:30px;height:12px;border-radius:8px;background:var(--y);animation:dot 1.2s ease-in-out infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{transform:scaleX(1.5)}}
 
 @media (max-width:900px){
   .grid{grid-template-columns:1fr 1fr}
-  .pills .pill:nth-child(n+3){display:none}
-  .badge{display:none}
+  .pills .pill:nth-child(n+3),.badge,.hint{display:none}
   .phone{width:180px;height:370px;border-radius:36px}
-  .phone .scr{border-radius:28px}
+  .scr{border-radius:28px}
   .ui .time{font-size:44px}
 }
 @media (max-width:600px){
@@ -191,18 +228,20 @@ nav.inv{color:var(--y)}
   .tag{top:calc(13vh + 30vw);left:5vw;max-width:60vw}
   .hero-foot{left:16px;right:16px}
   .reach input{min-width:0;width:100%}
+  .mosaic{width:520px;height:520px}
 }
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;animation-iteration-count:1!important;transition:none!important}}
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute">
-  <filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/><feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"/></filter>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="goo" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/><feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10"/></filter>
 </svg>
+<canvas id="ink"></canvas>
 <div id="cursor"></div>
 
 <nav id="nav">
-  <a href="#top" class="logo-x">✕ <span>BRUNI/TECH</span></a>
+  <a href="#top" class="logo-x"><b>✕</b> <span>BRUNI/TECH</span></a>
   <div class="badge">B—26</div>
   <div class="pills">
     <a class="pill" href="#lab">Каталог</a>
@@ -213,19 +252,21 @@ nav.inv{color:var(--y)}
 
 <!-- HERO -->
 <section class="hero" id="top">
-  <div class="goo" data-goo="hero"></div>
   <div class="wordmark">
-    <h1>Bruni</h1>
+    <h1 class="vel"><span class="mask"><span style="animation-delay:.05s">B</span><span style="animation-delay:.12s">r</span><span style="animation-delay:.19s">u</span><span style="animation-delay:.26s">n</span><span style="animation-delay:.33s">i</span></span></h1>
     <div class="script">tech</div>
   </div>
   <div class="tag">Золотой стандарт гаджетов нового поколения</div>
 
   <div class="stage">
-    <div class="float">
+    <div class="drop"><div class="float">
       <div class="tilt" id="heroTilt">
         <div class="phone">
           <div class="scr">
-            <div class="holo"></div><div class="holo2"></div>
+            <div class="holo"></div><div class="lines"></div>
+            <div class="gl a"><div class="holo"></div></div>
+            <div class="gl b"><div class="holo"></div></div>
+            <div class="scan"></div>
             <div class="island"></div>
             <div class="ui">
               <div><div class="date" id="date">вторник, 10 ноября</div><div class="time" id="clock">19:36</div></div>
@@ -236,13 +277,14 @@ nav.inv{color:var(--y)}
                 <div class="wd">ИИ<b>On</b></div>
               </div>
             </div>
-            <div class="glare"></div>
+            <div class="glare" id="glare"></div>
           </div>
         </div>
       </div>
-    </div>
+    </div></div>
   </div>
 
+  <div class="mono hint">Води мышкой — рисуй чернилами</div>
   <div class="hero-foot">
     <div class="scroll-ind"></div>
     <div class="mono">Смартфоны · Ноутбуки · ПК · Носимые</div>
@@ -250,37 +292,40 @@ nav.inv{color:var(--y)}
   </div>
 </section>
 
-<div class="ticker"><div>
+<div class="ticker" id="ticker"><div>
   <span>НОВИНКИ 2026</span><em>fresh</em><span>✦ СКЛАДНЫЕ СМАРТФОНЫ</span><span>✦ RTX-СБОРКИ</span><em>hot</em><span>✦ OLED-НОУТБУКИ</span><span>✦ ИИ-ЧАСЫ</span><span>✦ ПОРТАТИВНЫЕ КОНСОЛИ</span>
   <span>НОВИНКИ 2026</span><em>fresh</em><span>✦ СКЛАДНЫЕ СМАРТФОНЫ</span><span>✦ RTX-СБОРКИ</span><em>hot</em><span>✦ OLED-НОУТБУКИ</span><span>✦ ИИ-ЧАСЫ</span><span>✦ ПОРТАТИВНЫЕ КОНСОЛИ</span>
 </div></div>
 
 <!-- SHOWCASE -->
-<section class="show" id="show">
-  <h2>Тех, который<br>чувствуешь <em>feel it</em></h2>
-  <p class="lead">Мы отбираем устройства, которые выглядят как будущее и работают как надо. Листай витрину — каждая карточка живая.</p>
-  <div class="deck" id="deck">
-    <article class="card c1"><span class="mono">01 / Ноутбук</span><h3>Air&nbsp;Slab 14<br>OLED</h3><div class="art"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div><div class="price"><b>129 990 ₽</b><button class="btn">В корзину →</button></div></article>
-    <article class="card c2"><span class="mono">02 / Консоль</span><h3>Pocket&nbsp;Arc<br>Clear Edition</h3><div class="art"><div class="d-hand"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div><div class="price"><b>54 990 ₽</b><button class="btn">В корзину →</button></div></article>
-    <article class="card c3"><span class="mono">03 / Игровой ПК</span><h3>Tower&nbsp;X<br>RGB&nbsp;Pro</h3><div class="art"><div class="d-pc"><div class="fan"></div><div class="fan" style="animation-duration:.9s"></div></div></div><div class="price"><b>249 990 ₽</b><button class="btn y">В корзину →</button></div></article>
-    <article class="card c4"><span class="mono">04 / Часы</span><h3>Pulse&nbsp;Watch<br>Ultra</h3><div class="art"><div class="d-watch"><div class="ring"></div>72</div></div><div class="price"><b>39 990 ₽</b><button class="btn">В корзину →</button></div></article>
-    <article class="card c5"><span class="mono">05 / Аудио</span><h3>Bud&nbsp;Air<br>ANC 3</h3><div class="art"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div><div class="price"><b>17 990 ₽</b><button class="btn y">В корзину →</button></div></article>
+<section class="show dark-sec" id="show">
+  <div class="show-in" id="showIn">
+    <h2 class="vel">Тех, который<br>чувствуешь <em>feel it</em></h2>
+    <p class="lead">Мы отбираем устройства, которые выглядят как будущее и работают как надо. Листай вниз — витрина поедет сама.</p>
+    <div class="deck-wrap"><div class="deck" id="deck">
+      <article class="card c1"><span class="mono">01 / Ноутбук</span><h3>Air&nbsp;Slab 14<br>OLED</h3><div class="art"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div><div class="price"><b>129 990 ₽</b><button class="btn">В корзину →</button></div><div class="shine"></div></article>
+      <article class="card c2"><span class="mono">02 / Консоль</span><h3>Pocket&nbsp;Arc<br>Clear Edition</h3><div class="art"><div class="d-hand"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div><div class="price"><b>54 990 ₽</b><button class="btn">В корзину →</button></div><div class="shine"></div></article>
+      <article class="card c3"><span class="mono">03 / Игровой ПК</span><h3>Tower&nbsp;X<br>RGB&nbsp;Pro</h3><div class="art"><div class="d-pc"><div class="fan"></div><div class="fan" style="animation-duration:.9s"></div></div></div><div class="price"><b>249 990 ₽</b><button class="btn y">В корзину →</button></div><div class="shine"></div></article>
+      <article class="card c4"><span class="mono">04 / Часы</span><h3>Pulse&nbsp;Watch<br>Ultra</h3><div class="art"><div class="d-watch"><div class="ring"></div>72</div></div><div class="price"><b>39 990 ₽</b><button class="btn">В корзину →</button></div><div class="shine"></div></article>
+      <article class="card c5"><span class="mono">05 / Аудио</span><h3>Bud&nbsp;Air<br>ANC 3</h3><div class="art"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div><div class="price"><b>17 990 ₽</b><button class="btn y">В корзину →</button></div><div class="shine"></div></article>
+    </div></div>
   </div>
 </section>
 
 <!-- MANIFESTO -->
 <section class="mani" id="about">
-  <div class="shape" style="width:380px;height:380px;background:var(--pink);right:6vw;top:60px"></div>
-  <div class="shape" style="width:300px;height:260px;background:var(--blue);left:-60px;bottom:40px;animation-delay:-3s"></div>
-  <div class="shape" style="width:220px;height:220px;background:var(--green);right:30vw;bottom:-40px;animation-delay:-6s"></div>
+  <div class="shape" data-par="0.25" style="width:380px;height:380px;background:var(--pink);right:6vw;top:60px"></div>
+  <div class="shape" data-par="-0.2" style="width:300px;height:260px;background:var(--blue);left:-60px;bottom:40px;animation-delay:-3s"></div>
+  <div class="shape" data-par="0.4" style="width:220px;height:220px;background:var(--green);right:30vw;bottom:-40px;animation-delay:-6s"></div>
   <div class="mono lbl">Кто мы</div>
-  <p id="maniText">Bruni Tech — это цифровая лаборатория, где железо встречается с дизайном. Мы тестируем, собираем и привозим технологии, которые делают каждый день чуть более похожим на будущее.</p>
+  <p id="maniText" class="vel">Bruni Tech — это цифровая лаборатория, где железо встречается с дизайном. Мы тестируем, собираем и привозим технологии, которые делают каждый день чуть более похожим на будущее.</p>
 </section>
 
 <!-- LAB GRID -->
 <section class="lab" id="lab">
+  <div class="mosaic" id="mosaic"><div class="cells"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
   <div class="lab-head">
-    <h2>Лаборатория<br><em>gadgets</em></h2>
+    <h2 class="vel">Лаборатория<br><em>gadgets</em></h2>
     <div class="filters" id="filters">
       <button class="act" data-f="all">Всё</button>
       <button data-f="phone">Смартфоны</button>
@@ -291,31 +336,31 @@ nav.inv{color:var(--y)}
   </div>
   <div class="grid">
     <div class="item reveal" data-c="phone"><span class="mono num">B-01</span><span class="new">NEW</span>
-      <div class="dev"><div class="phone" style="width:130px;height:265px;border-radius:26px;padding:6px"><div class="scr" style="border-radius:21px"><div class="holo"></div><div class="island" style="width:44px;height:12px;top:8px"></div></div></div></div>
+      <div class="dev"><div class="fl"><div class="phone" style="width:130px;height:265px;border-radius:26px;padding:6px"><div class="scr" style="border-radius:21px"><div class="holo"></div><div class="gl a"><div class="holo"></div></div><div class="island" style="width:44px;height:12px;top:8px"></div></div></div></div></div>
       <div class="meta"><div><b>Neo Phone 7</b><span class="mono">6.7" · 1 ТБ</span></div><span class="mono">99 990 ₽</span></div></div>
     <div class="item reveal" data-c="pc"><span class="mono num">B-02</span>
-      <div class="dev"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div>
+      <div class="dev"><div class="fl"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div></div>
       <div class="meta"><div><b>Air Slab 14</b><span class="mono">OLED · 32 ГБ</span></div><span class="mono">129 990 ₽</span></div></div>
     <div class="item reveal" data-c="game"><span class="mono num">B-03</span><span class="new">HOT</span>
-      <div class="dev"><div class="d-hand" style="transform:scale(.85)"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div>
+      <div class="dev"><div class="fl"><div class="d-hand" style="transform:scale(.85)"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div></div>
       <div class="meta"><div><b>Pocket Arc</b><span class="mono">120 Гц · Wi-Fi 7</span></div><span class="mono">54 990 ₽</span></div></div>
     <div class="item reveal" data-c="wear"><span class="mono num">B-04</span>
-      <div class="dev"><div class="d-watch"><div class="ring"></div>72</div></div>
+      <div class="dev"><div class="fl"><div class="d-watch"><div class="ring"></div>72</div></div></div>
       <div class="meta"><div><b>Pulse Watch</b><span class="mono">ЭКГ · 14 дней</span></div><span class="mono">39 990 ₽</span></div></div>
     <div class="item reveal" data-c="pc"><span class="mono num">B-05</span><span class="new">NEW</span>
-      <div class="dev"><div class="d-pc"><div class="fan"></div><div class="fan"></div></div></div>
+      <div class="dev"><div class="fl"><div class="d-pc"><div class="fan"></div><div class="fan"></div></div></div></div>
       <div class="meta"><div><b>Tower X</b><span class="mono">RTX · 64 ГБ</span></div><span class="mono">249 990 ₽</span></div></div>
     <div class="item reveal" data-c="wear"><span class="mono num">B-06</span>
-      <div class="dev"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div>
+      <div class="dev"><div class="fl"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div></div>
       <div class="meta"><div><b>Bud Air ANC</b><span class="mono">40 ч · Hi-Res</span></div><span class="mono">17 990 ₽</span></div></div>
   </div>
 </section>
 
 <!-- REACH OUT -->
-<section class="reach" id="reach">
-  <div class="goo" data-goo="reach"></div>
+<section class="reach dark-sec" id="reach">
+  <div class="blobbox"><div class="big" id="bigBlob"></div></div>
   <div class="row" style="justify-content:flex-start"><span class="mono">Нужна консультация или сборка под задачу?</span></div>
-  <h2>На связи<em>let's talk</em></h2>
+  <div class="hw"><h2 class="vel">На связи<em>let's talk</em></h2><span class="peace">✌️</span></div>
   <div class="row">
     <form onsubmit="event.preventDefault();this.querySelector('button').textContent='Отправлено ✓';">
       <input type="email" required placeholder="твой e-mail">
@@ -333,110 +378,314 @@ nav.inv{color:var(--y)}
 <script>
 (() => {
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const mouse = {x: innerWidth/2, y: innerHeight/2};
-  const cur = document.getElementById('cursor');
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, k) => a + (b - a) * k;
+
+  /* ================= INK TRAIL (liquid cursor) ================= */
+  // Metaball renderer: soft sprites are summed additively on a half-res buffer
+  // (black ink in the red channel, yellow ink in the green channel), then thresholded.
+  const cv = $('#ink'), ctx = cv.getContext('2d');
+  const off = document.createElement('canvas'), octx = off.getContext('2d', {willReadFrequently: true});
+  const SC = 0.5, THR = 118, SHARP = 3;
+  const sprite = ch => {
+    const c = document.createElement('canvas'); c.width = c.height = 64;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(32,32,0,32,32,32);
+    const col = ch === 'r' ? '255,0,0' : '0,255,0';
+    gr.addColorStop(0, `rgba(${col},1)`); gr.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = gr; g.fillRect(0,0,64,64); return c;
+  };
+  const SPR = {'#0b0b0c': sprite('r'), '#ffd400': sprite('g')};
+  let W, H, DPR, OW, OH;
+  const resize = () => {
+    DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight;
+    cv.width = W*DPR; cv.height = H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+    OW = off.width = Math.ceil(W*SC); OH = off.height = Math.ceil(H*SC);
+  };
+  resize(); addEventListener('resize', resize);
+
+  const darkSecs = $$('.dark-sec');
+  const isDarkAt = clientY => darkSecs.some(s => { const r = s.getBoundingClientRect(); return clientY > r.top && clientY < r.bottom; });
+
+  const pts = [];          // points stored in page coordinates so ink scrolls with the page
+  const mouse = {x: W/2, y: H/2, px: null, py: null, has: false};
+  const cur = $('#cursor');
+
+  function addInk(x, y, r, color, vx = 0, vy = 0, decay = 0.5, a = 1) {
+    pts.push({x, y: y + scrollY, r, color, vx, vy, life: 1, decay, a});
+    if (pts.length > 900) pts.splice(0, pts.length - 900);
+  }
+
   addEventListener('pointermove', e => {
-    mouse.x = e.clientX; mouse.y = e.clientY;
-    cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px';
+    const x = e.clientX, y = e.clientY;
+    cur.style.left = x + 'px'; cur.style.top = y + 'px';
+    mouse.x = x; mouse.y = y; mouse.has = true;
+    if (mouse.px === null) { mouse.px = x; mouse.py = y; return; }
+    const dx = x - mouse.px, dy = y - mouse.py, d = Math.hypot(dx, dy);
+    const color = isDarkAt(y) ? '#ffd400' : '#0b0b0c';
+    const steps = Math.max(1, Math.ceil(d / 5));
+    const r = clamp(5 + d * 0.32, 5, 28) * (W < 700 ? 0.8 : 1);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      // alpha normalised by spacing so overlapping stamps sum to a constant line density
+      addInk(mouse.px + dx*t, mouse.py + dy*t, r * (0.85 + Math.random()*0.3), color, 0, 0, 0.55, clamp(0.55 * (d/steps) / r, 0.04, 1));
+    }
+    // splatter droplets on fast strokes
+    if (d > 28 && Math.random() < 0.55) {
+      const n = 1 + (Math.random()*3|0);
+      for (let k = 0; k < n; k++) {
+        const nx = -dy / d, ny = dx / d, side = Math.random() < .5 ? -1 : 1, sp = 2 + Math.random()*5;
+        addInk(x, y, 4 + Math.random()*9, color, nx*side*sp + dx*0.05, ny*side*sp + dy*0.05, 0.7);
+      }
+    }
+    mouse.px = x; mouse.py = y;
+  }, {passive: true});
+  addEventListener('pointerleave', () => { mouse.px = null; });
+  addEventListener('pointerdown', e => {      // click = ink splash
+    const color = isDarkAt(e.clientY) ? '#ffd400' : '#0b0b0c';
+    addInk(e.clientX, e.clientY, 46, color, 0, 0, 0.45);
+    for (let k = 0; k < 14; k++) {
+      const a = Math.random()*Math.PI*2, sp = 3 + Math.random()*9;
+      addInk(e.clientX, e.clientY, 5 + Math.random()*14, color, Math.cos(a)*sp, Math.sin(a)*sp, 0.6);
+    }
   });
-  document.querySelectorAll('a,button,.card,.item,input').forEach(el => {
+
+  // ambient blobs drifting in the hero (part of the same liquid layer)
+  const amb = Array.from({length: 6}, () => ({ax: Math.random(), ay: Math.random(), sx: .2 + Math.random()*.35, sy: .2 + Math.random()*.35, ph: Math.random()*6.28, r: 18 + Math.random()*34}));
+
+  function blob(x, y, r, color, a = 1) {
+    const s = r * 2 * SC;  // linear falloff to 2r → threshold contour ≈ r
+    octx.globalAlpha = a;
+    octx.drawImage(SPR[color], x*SC - s, y*SC - s, s*2, s*2);
+  }
+  function drawInk(dt, t) {
+    ctx.clearRect(0, 0, W, H);
+    octx.globalCompositeOperation = 'source-over';
+    octx.clearRect(0, 0, OW, OH);
+    octx.globalCompositeOperation = 'lighter';
+    let any = false;
+    const sy = scrollY;
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      p.life -= dt * p.decay;
+      if (p.life <= 0) { pts.splice(i, 1); continue; }
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.9; p.vy = p.vy * 0.9 + 0.12; // little gravity = drips
+      const y = p.y - sy;
+      if (y < -60 || y > H + 60) continue;
+      blob(p.x, y, p.r * Math.pow(p.life, 0.7), p.color, p.a); any = true;
+    }
+    // hero ambient goo
+    const heroB = $('#top').getBoundingClientRect();
+    if (heroB.bottom > 0) {
+      any = true;
+      amb.forEach((b, i) => {
+        const x = (b.ax*0.8 + 0.1)*W + Math.sin(t*b.sx + b.ph)*W*0.2;
+        const y = heroB.top + (b.ay*0.7 + 0.2)*heroB.height + Math.cos(t*b.sy + b.ph*1.3)*heroB.height*0.18;
+        const r = b.r * (1 + Math.sin(t*0.9 + i)*0.25) * (W < 700 ? 0.55 : 1);
+        blob(x, y, r, '#0b0b0c');
+      });
+    }
+    octx.globalAlpha = 1;
+    if (!any) return;
+    const img = octx.getImageData(0, 0, OW, OH), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const ak = (d[i] - THR) * SHARP, ay = (d[i+1] - THR) * SHARP;
+      if (ak <= 0 && ay <= 0) { d[i+3] = 0; continue; }
+      if (ak >= ay) { d[i] = 11; d[i+1] = 11; d[i+2] = 12; d[i+3] = ak > 255 ? 255 : ak; }
+      else { d[i] = 255; d[i+1] = 212; d[i+2] = 0; d[i+3] = ay > 255 ? 255 : ay; }
+    }
+    octx.putImageData(img, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(off, 0, 0, W, H);
+  }
+
+  // idle "auto-draw" so the effect is visible before the user moves the mouse / on touch devices
+  let idleT = 0;
+  function autoInk(dt, t) {
+    if (mouse.has || scrollY > innerHeight) return;
+    idleT += dt;
+    const x = W*0.5 + Math.sin(idleT*1.3)*W*0.32, y = H*0.62 + Math.sin(idleT*2.6)*H*0.14;
+    const r = 14 + Math.sin(idleT*5)*6;
+    addInk(x, y, r, '#0b0b0c', 0, 0, 0.6, clamp(0.55 * 8 / r, 0.04, 1));
+  }
+
+  /* ================= liquid edges between sections ================= */
+  function makeEdge(sec, color, pos = 'top') {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', 'edge ' + pos); svg.setAttribute('viewBox', '0 0 1000 180'); svg.setAttribute('preserveAspectRatio', 'none');
+    const path = document.createElementNS(ns, 'path'); path.setAttribute('fill', color);
+    svg.appendChild(path); pos === 'top' ? sec.prepend(svg) : sec.append(svg);
+    const drips = Array.from({length: 7}, (_, i) => ({x: 60 + i*140 + Math.random()*60, w: 30 + Math.random()*50, h: 40 + Math.random()*90, sp: .4 + Math.random()*.8, ph: Math.random()*6}));
+    return {sec, path, drips};
+  }
+  const edges = [makeEdge($('#ticker'), '#0b0b0c'), makeEdge($('#show'), '#0b0b0c', 'bottom'), makeEdge($('#reach'), '#0b0b0c')];
+  $('#ticker').style.position = 'relative';
+  function drawEdges(t, vel) {
+    edges.forEach(e => {
+      const r = e.sec.getBoundingClientRect();
+      if (r.top > H + 200 || r.bottom < -200) return;
+      const prog = clamp(1 - (e.sec === show ? r.bottom : r.top) / H, 0, 1); // drips grow as the edge rises
+      let d = 'M0,180 ';
+      for (let x = 0; x <= 1000; x += 20) {
+        let h = 18 + Math.sin(x*0.012 + t*1.6)*8 + Math.sin(x*0.031 - t*2.1)*5 + Math.abs(vel)*0.25*Math.sin(x*0.05 + t*8);
+        e.drips.forEach(dr => {
+          const g = Math.exp(-Math.pow((x - dr.x) / dr.w, 2));
+          h += g * dr.h * (0.55 + 0.45*Math.sin(t*dr.sp + dr.ph)) * (0.4 + prog);
+        });
+        d += `L${x},${clamp(180 - h, 0, 180).toFixed(1)} `;
+      }
+      e.path.setAttribute('d', d + 'L1000,180 Z');
+    });
+  }
+
+  /* ================= blob path helper (for clip-path) ================= */
+  function blobPath(cx, cy, R, t, n = 9, amp = .22, seed = 0) {
+    const p = [];
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2;
+      const rr = R * (1 + amp*Math.sin(t*1.1 + i*1.7 + seed) + amp*.6*Math.sin(t*.7 + i*2.9 + seed*2));
+      p.push([cx + Math.cos(a)*rr, cy + Math.sin(a)*rr]);
+    }
+    let d = `M${((p[0][0]+p[n-1][0])/2).toFixed(1)},${((p[0][1]+p[n-1][1])/2).toFixed(1)}`;
+    for (let i = 0; i < n; i++) {
+      const c = p[i], nx = p[(i+1)%n];
+      d += ` Q${c[0].toFixed(1)},${c[1].toFixed(1)} ${((c[0]+nx[0])/2).toFixed(1)},${((c[1]+nx[1])/2).toFixed(1)}`;
+    }
+    return d + 'Z';
+  }
+
+  /* ================= elements ================= */
+  const tilt = $('#heroTilt'), glare = $('#glare');
+  const deck = $('#deck'), show = $('#show'), showIn = $('#showIn');
+  const cards = $$('.card');
+  const nav = $('#nav'), root = document.documentElement;
+  const ticker = $('#ticker > div');
+  const mosaic = $('#mosaic'), lab = $('#lab');
+  const big = $('#bigBlob'), reach = $('#reach');
+  const shapes = $$('.shape'), mani = $('#about');
+  const devs = $$('.item .dev');
+
+  let lastY = scrollY, vel = 0, tickX = 0, rx = 0, ry = 0;
+  const mos = {x: 0, y: 0};
+  let last = performance.now();
+
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t = now / 1000;
+    const sy = scrollY;
+
+    // scroll velocity → skew + chromatic aberration
+    const raw = sy - lastY; lastY = sy;
+    vel = lerp(vel, clamp(raw, -80, 80), 0.18);
+    root.style.setProperty('--v', vel.toFixed(2));
+
+    autoInk(dt, t);
+    drawInk(dt, t);
+    drawEdges(t, vel);
+
+    // hero phone: mouse tilt + idle sway + scroll spin
+    const tx = (mouse.y/H - .5) * -26, ty = (mouse.x/W - .5) * 44 + Math.sin(t*0.6)*10 + sy*0.18;
+    rx = lerp(rx, tx, .08); ry = lerp(ry, ty, .08);
+    tilt.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(${sy*0.3}px) rotateZ(${vel*0.15}deg)`;
+    glare.style.background = `linear-gradient(${120 + ry*2}deg,rgba(255,255,255,.45),transparent 45%)`;
+
+    // ticker speeds up with scroll velocity
+    tickX -= 1.2 + Math.abs(vel)*0.6;
+    const tw = ticker.scrollWidth / 2; if (-tickX > tw) tickX += tw;
+    ticker.style.transform = `translateX(${tickX}px)`;
+
+    // showcase: 3D tilt-in as it enters + horizontal deck on scroll
+    const sr = show.getBoundingClientRect();
+    if (sr.bottom > 0 && sr.top < H) {
+      const enter = clamp(1 - sr.top / H, 0, 1);
+      showIn.style.transform = `rotateX(${(1-enter)*28}deg) scale(${0.85 + enter*0.15}) translateY(${(1-enter)*80}px)`;
+      const p = clamp((H - sr.top) / (sr.height + H), 0, 1);
+      const max = Math.max(0, deck.scrollWidth - W);
+      deck.style.transform = `translateX(${-p*max*1.15 + max*0.08}px)`;
+      cards.forEach((c, i) => {
+        if (c.matches(':hover')) return;
+        const cr = c.getBoundingClientRect();
+        const off = ((cr.left + cr.width/2) / W - .5);
+        c.style.transform = `rotateY(${off*-38}deg) rotateX(${6 + vel*0.12}deg) translateZ(${-Math.abs(off)*120}px)`;
+      });
+    }
+
+    // manifesto shapes parallax
+    const mr = mani.getBoundingClientRect();
+    if (mr.bottom > 0 && mr.top < H) shapes.forEach((s, i) => {
+      s.style.transform = `translateY(${mr.top * parseFloat(s.dataset.par)}px) rotate(${t*8*(i%2?1:-1) + mr.top*0.05}deg)`;
+    });
+
+    // lab: morphing colour mosaic blob follows the cursor
+    const lr = lab.getBoundingClientRect();
+    if (lr.bottom > 0 && lr.top < H) {
+      const S = mosaic.offsetWidth;
+      const inside = mouse.has && mouse.y > lr.top && mouse.y < lr.bottom;
+      const targX = (inside ? mouse.x : W*0.5 + Math.sin(t*.4)*W*0.25) - S/2;
+      const targY = (inside ? mouse.y - lr.top : H*0.5 - lr.top + Math.cos(t*.3)*120) - S/2;
+      mos.x = lerp(mos.x, targX, .06); mos.y = lerp(mos.y, clamp(targY, -S*0.3, lr.height - S*0.7), .06);
+      mosaic.style.transform = `translate(${mos.x}px,${mos.y}px)`;
+      mosaic.style.clipPath = `path('${blobPath(S/2, S/2, S*0.33, t, 10, .2)}')`;
+      // devices drift away from the cursor a bit
+      devs.forEach(d => {
+        const b = d.getBoundingClientRect();
+        const dx = (b.left + b.width/2 - mouse.x), dy = (b.top + b.height/2 - mouse.y);
+        const dist = Math.hypot(dx, dy) || 1, f = clamp(1 - dist/420, 0, 1) * 26;
+        d.style.translate = `${dx/dist*f}px ${dy/dist*f}px`;
+      });
+    }
+
+    // reach: big yellow liquid blob
+    const rr = reach.getBoundingClientRect();
+    if (rr.bottom > 0 && rr.top < H) {
+      const S = big.offsetWidth;
+      big.style.clipPath = `path('${blobPath(S/2, S/2, S*0.36, t*1.2, 11, .24, 3)}')`;
+      big.style.transform = `translate(${(mouse.x/W - .5)*80}px,${(mouse.y/H - .5)*60 + rr.top*0.15}px) rotate(${t*10}deg)`;
+    }
+
+    // nav / cursor colour over dark sections
+    nav.classList.toggle('inv', isDarkAt(40));
+    document.body.classList.toggle('dark', isDarkAt(mouse.y));
+
+    requestAnimationFrame(frame);
+  }
+  if (!reduce) requestAnimationFrame(frame);
+
+  /* ================= small interactions ================= */
+  $$('a,button,.card,.item,input').forEach(el => {
     el.addEventListener('pointerenter', () => cur.classList.add('big'));
     el.addEventListener('pointerleave', () => cur.classList.remove('big'));
   });
+  cards.forEach(c => c.addEventListener('pointermove', e => {
+    const r = c.getBoundingClientRect();
+    c.style.setProperty('--mx', (e.clientX - r.left) + 'px'); c.style.setProperty('--my', (e.clientY - r.top) + 'px');
+  }));
 
-  // clock
   const pad = n => String(n).padStart(2,'0');
-  const tick = () => {
-    const d = new Date();
-    document.getElementById('clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
-    document.getElementById('date').textContent = d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
-  };
+  const tick = () => { const d = new Date(); $('#clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()); $('#date').textContent = d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'}); };
   tick(); setInterval(tick, 10000);
 
-  // goo blobs: drifting metaballs + one that follows the cursor
-  const goos = [...document.querySelectorAll('.goo')].map(g => {
-    const n = g.dataset.goo === 'hero' ? 7 : 6;
-    const blobs = [];
-    for (let i = 0; i < n; i++) {
-      const el = document.createElement('i');
-      const r = 60 + Math.random()*130;
-      el.style.width = el.style.height = r + 'px';
-      g.appendChild(el);
-      blobs.push({el, r, ax: Math.random(), ay: Math.random(), sx: .15+Math.random()*.35, sy: .15+Math.random()*.35, ph: Math.random()*6.28});
-    }
-    const follow = document.createElement('i');
-    follow.style.width = follow.style.height = '110px';
-    g.appendChild(follow);
-    return {g, blobs, follow, fx: 0, fy: 0};
-  });
-
-  const tilt = document.getElementById('heroTilt');
-  const deck = document.getElementById('deck');
-  const show = document.getElementById('show');
-  const nav = document.getElementById('nav');
-  const reach = document.getElementById('reach');
-  let t0 = performance.now();
-
-  function frame(now) {
-    const t = (now - t0) / 1000;
-    goos.forEach(o => {
-      const rect = o.g.getBoundingClientRect();
-      if (rect.bottom < 0 || rect.top > innerHeight) return;
-      const W = rect.width, H = rect.height;
-      o.blobs.forEach((b, i) => {
-        const x = (b.ax*0.8 + 0.1)*W + Math.sin(t*b.sx + b.ph)*W*0.22 - b.r/2;
-        const y = (b.ay*0.8 + 0.1)*H + Math.cos(t*b.sy + b.ph*1.3)*H*0.2 - b.r/2;
-        const s = 1 + Math.sin(t*0.8 + i)*0.18;
-        b.el.style.transform = `translate(${x}px,${y}px) scale(${s})`;
-      });
-      const tx = mouse.x - rect.left - 55, ty = mouse.y - rect.top - 55;
-      o.fx += (tx - o.fx) * 0.12; o.fy += (ty - o.fy) * 0.12;
-      o.follow.style.transform = `translate(${o.fx}px,${o.fy}px)`;
-    });
-
-    // hero device tilt + scroll spin
-    const sy = scrollY;
-    const rx = (mouse.y/innerHeight - .5) * -24;
-    const ry = (mouse.x/innerWidth - .5) * 40 + Math.sin(t*0.6)*8 + sy*0.15;
-    tilt.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(${sy*0.25}px)`;
-
-    // horizontal deck driven by vertical scroll
-    const sr = show.getBoundingClientRect();
-    const p = Math.min(1, Math.max(0, (innerHeight - sr.top) / (sr.height + innerHeight)));
-    const max = Math.max(0, deck.scrollWidth - innerWidth);
-    deck.style.transform = `translateX(${-p*max*1.1 + max*0.05}px)`;
-
-    // nav inversion over dark sections
-    const dark = [show, reach].some(s => { const r = s.getBoundingClientRect(); return r.top < 40 && r.bottom > 40; });
-    nav.classList.toggle('inv', dark);
-    document.body.classList.toggle('dark', [show, reach].some(s => { const r = s.getBoundingClientRect(); return r.top < mouse.y && r.bottom > mouse.y; }));
-
-    if (!reduce) requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-
-  // manifesto: words light up with scroll
-  const mt = document.getElementById('maniText');
+  // manifesto words light up and pop in with scroll
+  const mt = $('#maniText');
   mt.innerHTML = mt.textContent.trim().split(/\s+/).map(w => `<span>${w}</span>`).join(' ');
   const words = [...mt.children];
   const lightWords = () => {
     const r = mt.getBoundingClientRect();
-    const p = Math.min(1, Math.max(0, (innerHeight*0.85 - r.top) / (r.height + innerHeight*0.3)));
+    const p = clamp((H*0.85 - r.top) / (r.height + H*0.3), 0, 1);
     const k = Math.round(p * words.length);
-    words.forEach((w, i) => w.classList.toggle('on', i < k));
+    words.forEach((w, i) => w.classList.toggle('on', reduce || i < k));
   };
-  addEventListener('scroll', lightWords, {passive:true}); lightWords();
+  addEventListener('scroll', lightWords, {passive: true}); lightWords();
 
-  // reveal
-  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold:.15});
-  document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (i%3)*90 + 'ms'; io.observe(el); });
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold: .15});
+  $$('.reveal').forEach((el, i) => { el.style.transitionDelay = (i%3)*110 + 'ms'; io.observe(el); });
 
-  // filters
-  document.getElementById('filters').addEventListener('click', e => {
+  $('#filters').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    document.querySelectorAll('#filters button').forEach(x => x.classList.toggle('act', x === b));
+    $$('#filters button').forEach(x => x.classList.toggle('act', x === b));
     const f = b.dataset.f;
-    document.querySelectorAll('.item').forEach(it => it.classList.toggle('hide', f !== 'all' && it.dataset.c !== f));
+    $$('.item').forEach(it => it.classList.toggle('hide', f !== 'all' && it.dataset.c !== f));
   });
 })();
 </script>
