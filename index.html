@@ -1,1 +1,444 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bruni Tech — гаджеты будущего</title>
+<meta name="description" content="Bruni Tech — смартфоны, ноутбуки, игровые ПК и носимая электроника нового поколения.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;600;800;900&family=Mr+Dafoe&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --y:#ffd400; --y2:#ffe45c; --k:#0b0b0c; --k2:#1a1a1d; --w:#fff;
+  --pink:#ff3d8b; --blue:#2f6bff; --green:#21d07a; --orange:#ff6a1a; --violet:#9a5cff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--y);color:var(--k);font-family:"Inter Tight",system-ui,sans-serif;overflow-x:hidden;cursor:none}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--k);color:var(--y)}
+.mono{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
 
+/* ---------- cursor ---------- */
+#cursor{position:fixed;left:0;top:0;width:14px;height:14px;border-radius:50%;background:var(--k);pointer-events:none;z-index:100;transform:translate(-50%,-50%);transition:width .25s,height .25s,background .25s;mix-blend-mode:normal}
+#cursor.big{width:64px;height:64px;background:rgba(11,11,12,.15);border:1.5px solid var(--k)}
+.dark #cursor{background:var(--y)}
+@media (hover:none){body{cursor:auto}#cursor{display:none}}
+
+/* ---------- nav ---------- */
+nav{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;padding:18px 28px;z-index:50;pointer-events:none}
+nav>*{pointer-events:auto}
+.logo-x{font-size:26px;font-weight:900;line-height:1;display:flex;gap:10px;align-items:center}
+.logo-x span{font-size:12px;font-weight:800;letter-spacing:.1em}
+.pills{display:flex;gap:6px}
+.pill{border:1.5px solid var(--k);border-radius:99px;padding:6px 14px;font-size:12px;font-weight:600;background:var(--y);transition:.2s}
+.pill:hover{background:var(--k);color:var(--y)}
+.badge{position:absolute;left:50%;top:18px;transform:translateX(-50%);border:1.5px solid var(--k);border-radius:99px;padding:5px 12px;font-weight:800;font-size:12px;background:var(--y)}
+nav.inv .pill,nav.inv .badge{background:var(--k);color:var(--y);border-color:var(--y)}
+nav.inv{color:var(--y)}
+
+/* ---------- goo layer ---------- */
+.goo{position:absolute;inset:0;filter:url(#goo);pointer-events:none;overflow:hidden}
+.goo i{position:absolute;left:0;top:0;border-radius:50%;background:var(--k);will-change:transform}
+
+/* ---------- hero ---------- */
+.hero{position:relative;height:100vh;min-height:640px;overflow:hidden}
+.wordmark{position:absolute;left:4vw;top:11vh;line-height:.8}
+.wordmark h1{position:relative;z-index:2;font-weight:900;font-size:min(23vw,330px);letter-spacing:-.06em}
+.wordmark .script{position:absolute;right:-12vw;top:42%;font-family:"Mr Dafoe",cursive;font-size:min(17vw,250px);color:var(--k);transform:rotate(-8deg);z-index:4;white-space:nowrap;pointer-events:none}
+.tag{position:absolute;left:4.4vw;top:calc(11vh + min(19vw,275px));font-weight:800;font-size:11px;letter-spacing:.12em;text-transform:uppercase;z-index:2}
+.hero-foot{position:absolute;left:28px;right:28px;bottom:22px;display:flex;justify-content:space-between;align-items:end;z-index:3}
+.scroll-ind{width:22px;height:36px;border:1.5px solid var(--k);border-radius:12px;position:relative}
+.scroll-ind:after{content:"";position:absolute;left:50%;top:7px;width:4px;height:7px;border-radius:2px;background:var(--k);transform:translateX(-50%);animation:sc 1.6s infinite}
+@keyframes sc{0%{opacity:0;transform:translate(-50%,0)}40%{opacity:1}100%{opacity:0;transform:translate(-50%,12px)}}
+
+.stage{position:absolute;left:50%;top:54%;transform:translate(-50%,-50%);perspective:1200px;z-index:3}
+.float{animation:float 6s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+.tilt{transform-style:preserve-3d;transition:transform .15s linear}
+
+/* ---------- phone ---------- */
+.phone{position:relative;width:230px;height:470px;border-radius:44px;background:linear-gradient(135deg,#d9d9de,#6d6d75 40%,#f2f2f5 60%,#8a8a92);padding:9px;transform-style:preserve-3d;box-shadow:0 60px 80px -30px rgba(0,0,0,.55)}
+.phone:before{content:"";position:absolute;inset:0;border-radius:44px;transform:translateZ(-14px);background:#2a2a2f}
+.phone .scr{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:#000;transform:translateZ(1px)}
+.phone .island{position:absolute;top:12px;left:50%;width:84px;height:24px;border-radius:20px;background:#000;transform:translateX(-50%);z-index:3}
+.holo{position:absolute;inset:-40%;background:conic-gradient(from 0deg,#ff3d8b,#ffd400,#21d07a,#2f6bff,#9a5cff,#ff3d8b);animation:spin 7s linear infinite;filter:blur(18px) saturate(1.4)}
+.holo2{position:absolute;inset:0;background:repeating-linear-gradient(115deg,rgba(255,255,255,.0) 0 14px,rgba(255,255,255,.28) 14px 16px);mix-blend-mode:overlay;animation:slide 3s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slide{to{background-position:120px 0}}
+.ui{position:absolute;inset:0;z-index:2;color:#fff;padding:52px 18px 18px;display:flex;flex-direction:column;justify-content:space-between}
+.ui .time{font-size:58px;font-weight:900;letter-spacing:-.04em;line-height:1}
+.ui .date{font-size:13px;font-weight:600;opacity:.85}
+.ui .widgets{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ui .wd{background:rgba(0,0,0,.35);backdrop-filter:blur(8px);border-radius:16px;padding:10px;font-size:11px;font-weight:600}
+.ui .wd b{display:block;font-size:20px;font-weight:900}
+.glare{position:absolute;inset:0;border-radius:36px;background:linear-gradient(120deg,rgba(255,255,255,.35),transparent 40%);z-index:4;pointer-events:none}
+.cam{position:absolute;width:12px;height:12px;border-radius:50%;background:#111;box-shadow:inset 0 0 0 3px #333}
+
+/* ---------- marquee ---------- */
+.ticker{background:var(--k);color:var(--y);overflow:hidden;white-space:nowrap;padding:14px 0;font-weight:900;font-size:28px;letter-spacing:-.02em;position:relative;z-index:4}
+.ticker div{display:inline-block;animation:mq 22s linear infinite}
+.ticker span{margin:0 26px}
+.ticker em{font-family:"Mr Dafoe";font-style:normal;font-weight:400;font-size:38px}
+@keyframes mq{to{transform:translateX(-50%)}}
+
+/* ---------- showcase (dark) ---------- */
+.show{background:var(--k);color:var(--w);position:relative;overflow:hidden;padding:120px 0 140px}
+.show h2{font-size:min(11vw,150px);font-weight:900;letter-spacing:-.05em;line-height:.85;padding:0 4vw;color:var(--y)}
+.show h2 em{font-family:"Mr Dafoe";font-style:normal;font-weight:400;color:#fff;font-size:.8em}
+.show p.lead{max-width:440px;margin:24px 4vw 0;color:#aaa;font-size:15px;line-height:1.5}
+.deck{display:flex;gap:28px;padding:70px 4vw 0;perspective:1400px;width:max-content;will-change:transform}
+.card{width:340px;height:440px;border-radius:26px;position:relative;overflow:hidden;flex:none;transform:rotateY(-14deg) rotateX(6deg);transition:transform .5s cubic-bezier(.2,.8,.2,1);padding:24px;display:flex;flex-direction:column;justify-content:space-between}
+.card:hover{transform:rotateY(0) rotateX(0) translateY(-10px) scale(1.03)}
+.card h3{font-size:34px;font-weight:900;letter-spacing:-.03em;line-height:.95;position:relative;z-index:2}
+.card .mono{position:relative;z-index:2}
+.card .art{position:relative;flex:1;display:grid;place-items:center;z-index:1}
+.c1{background:var(--green);color:var(--k)}
+.c2{background:var(--pink);color:var(--k)}
+.c3{background:var(--blue);color:#fff}
+.c4{background:var(--orange);color:var(--k)}
+.c5{background:var(--violet);color:#fff}
+.price{display:flex;justify-content:space-between;align-items:end;position:relative;z-index:2}
+.price b{font-size:22px;font-weight:900}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:99px;padding:10px 18px;font-weight:800;font-size:13px;background:var(--k);color:var(--y);border:0;cursor:none}
+.btn.y{background:var(--y);color:var(--k)}
+
+/* ---------- mini devices (pure CSS) ---------- */
+.d-laptop{width:230px;transform:rotateX(8deg)}
+.d-laptop .lid{height:145px;border-radius:12px 12px 4px 4px;background:#111;padding:8px;box-shadow:0 0 0 2px #444 inset}
+.d-laptop .lid div{height:100%;border-radius:6px;background:linear-gradient(160deg,#00e1ff,#2f6bff 45%,#9a5cff);position:relative;overflow:hidden}
+.d-laptop .lid div:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.12) 0 2px,transparent 2px 5px)}
+.d-laptop .base{height:12px;margin:0 -18px;border-radius:0 0 14px 14px;background:linear-gradient(#d6d6da,#8f8f96)}
+.d-pc{width:120px;height:220px;border-radius:12px;background:#111;border:3px solid #333;position:relative;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;box-shadow:0 30px 40px -20px #000}
+.fan{width:72px;height:72px;border-radius:50%;border:4px solid #222;background:conic-gradient(var(--pink),var(--y),var(--green),var(--blue),var(--violet),var(--pink));animation:spin 1.2s linear infinite;position:relative}
+.fan:after{content:"";position:absolute;inset:22px;border-radius:50%;background:#111}
+.d-watch{width:120px;height:140px;border-radius:34px;background:#111;border:5px solid #c9c9cf;display:grid;place-items:center;position:relative;color:#fff;font-weight:900;font-size:30px}
+.d-watch:before,.d-watch:after{content:"";position:absolute;left:18px;right:18px;height:70px;background:#1d1d20;z-index:-1;border-radius:10px}
+.d-watch:before{top:-62px}.d-watch:after{bottom:-62px}
+.d-watch .ring{position:absolute;inset:14px;border-radius:24px;border:5px solid var(--green);border-right-color:transparent;animation:spin 3s linear infinite}
+.d-pods{display:flex;gap:16px}
+.d-pods i{width:46px;height:96px;border-radius:24px 24px 14px 14px;background:linear-gradient(145deg,#fff,#cfcfd6);position:relative;box-shadow:0 20px 30px -10px rgba(0,0,0,.4)}
+.d-pods i:after{content:"";position:absolute;left:11px;top:12px;width:24px;height:24px;border-radius:50%;background:#222}
+.d-hand{width:250px;height:120px;border-radius:60px;background:linear-gradient(145deg,rgba(255,255,255,.65),rgba(200,200,210,.35));border:2px solid rgba(255,255,255,.8);position:relative;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);box-shadow:0 30px 40px -18px rgba(0,0,0,.5)}
+.d-hand .s{width:110px;height:72px;border-radius:8px;background:#000;overflow:hidden;position:relative}
+.d-hand .s .holo{filter:blur(10px)}
+.d-hand .dp{position:absolute;left:26px;width:34px;height:34px;background:
+  linear-gradient(#222,#222) center/12px 34px no-repeat,linear-gradient(#222,#222) center/34px 12px no-repeat}
+.d-hand .ab{position:absolute;right:24px;width:40px;height:40px}
+.d-hand .ab b{position:absolute;width:15px;height:15px;border-radius:50%;background:var(--pink)}
+.d-hand .ab b:nth-child(1){top:0;left:12px}.d-hand .ab b:nth-child(2){bottom:0;left:12px;background:var(--blue)}
+.d-hand .ab b:nth-child(3){left:0;top:12px;background:var(--green)}.d-hand .ab b:nth-child(4){right:0;top:12px;background:var(--y)}
+
+/* ---------- manifesto ---------- */
+.mani{position:relative;padding:150px 4vw 160px;overflow:hidden}
+.mani .lbl{margin-bottom:24px}
+.mani p{font-size:min(6.2vw,84px);font-weight:900;line-height:.98;letter-spacing:-.04em;text-transform:uppercase;position:relative;z-index:2;max-width:1300px}
+.mani p span{opacity:.14;transition:opacity .3s}
+.mani p span.on{opacity:1}
+.shape{position:absolute;z-index:1;border-radius:46% 54% 40% 60%/55% 40% 60% 45%;animation:morph 10s ease-in-out infinite;mix-blend-mode:multiply;opacity:.9}
+@keyframes morph{0%,100%{border-radius:46% 54% 40% 60%/55% 40% 60% 45%;transform:rotate(0)}50%{border-radius:60% 40% 58% 42%/40% 60% 40% 60%;transform:rotate(25deg)}}
+
+/* ---------- grid ---------- */
+.lab{padding:40px 4vw 140px;position:relative}
+.lab-head{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-bottom:50px}
+.lab-head h2{font-size:min(9vw,120px);font-weight:900;letter-spacing:-.05em;line-height:.85}
+.lab-head h2 em{font-family:"Mr Dafoe";font-style:normal;font-weight:400}
+.filters{display:flex;gap:6px;flex-wrap:wrap}
+.filters button{font:600 12px "Inter Tight";border:1.5px solid var(--k);background:transparent;border-radius:99px;padding:7px 14px;cursor:none}
+.filters button.act{background:var(--k);color:var(--y)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+.item{position:relative;height:380px;border-radius:24px;display:grid;place-items:center;transition:transform .4s cubic-bezier(.2,.8,.2,1),opacity .4s;perspective:900px}
+.item .dev{transition:transform .4s cubic-bezier(.2,.8,.2,1);transform-style:preserve-3d}
+.item:hover .dev{transform:translateY(-14px) rotate(-4deg) scale(1.06)}
+.item .meta{position:absolute;left:18px;bottom:16px;right:18px;display:flex;justify-content:space-between;align-items:end}
+.item .meta b{display:block;font-size:20px;font-weight:900;letter-spacing:-.02em}
+.item .num{position:absolute;left:18px;top:16px}
+.item .new{position:absolute;right:16px;top:14px;background:var(--k);color:var(--y);border-radius:99px;padding:4px 10px;font-weight:800;font-size:11px}
+.item.hide{opacity:.12;transform:scale(.96)}
+.item:before{content:"";position:absolute;inset:0;border-radius:24px;border:1.5px dashed rgba(11,11,12,.25)}
+.reveal{opacity:0;transform:translateY(40px);transition:opacity .8s,transform .8s cubic-bezier(.2,.8,.2,1)}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- reach out ---------- */
+.reach{background:var(--k);color:var(--y);position:relative;overflow:hidden;min-height:100vh;padding:120px 4vw 30px;display:flex;flex-direction:column;justify-content:space-between}
+.reach .goo i{background:var(--y)}
+.reach h2{font-size:min(19vw,290px);font-weight:900;letter-spacing:-.06em;line-height:.8;position:relative;z-index:2;mix-blend-mode:difference;color:var(--y)}
+.reach h2 em{font-family:"Mr Dafoe";font-weight:400;font-style:normal;letter-spacing:0;display:block;font-size:.6em;margin-left:20vw}
+.reach .row{display:flex;justify-content:space-between;align-items:end;gap:30px;flex-wrap:wrap;position:relative;z-index:2}
+.reach form{display:flex;gap:8px;flex-wrap:wrap}
+.reach input{font:600 15px "Inter Tight";background:transparent;border:1.5px solid var(--y);color:var(--y);border-radius:99px;padding:12px 18px;min-width:260px;outline:none;cursor:none}
+.reach input::placeholder{color:rgba(255,212,0,.5)}
+.foot{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;border-top:1px solid rgba(255,212,0,.25);padding-top:18px;margin-top:60px;position:relative;z-index:2}
+.foot a:hover{text-decoration:underline}
+.dots{display:flex;gap:6px}.dots i{width:30px;height:12px;border-radius:8px;background:var(--y)}
+
+@media (max-width:900px){
+  .grid{grid-template-columns:1fr 1fr}
+  .pills .pill:nth-child(n+3){display:none}
+  .badge{display:none}
+  .phone{width:180px;height:370px;border-radius:36px}
+  .phone .scr{border-radius:28px}
+  .ui .time{font-size:44px}
+}
+@media (max-width:600px){
+  nav{padding:14px 16px}
+  .grid{grid-template-columns:1fr}
+  .card{width:270px;height:370px}
+  .wordmark{top:13vh}
+  .wordmark .script{right:-4vw;top:60%}
+  .stage{top:62%}
+  .tag{top:calc(13vh + 30vw);left:5vw;max-width:60vw}
+  .hero-foot{left:16px;right:16px}
+  .reach input{min-width:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/><feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"/></filter>
+</svg>
+<div id="cursor"></div>
+
+<nav id="nav">
+  <a href="#top" class="logo-x">✕ <span>BRUNI/TECH</span></a>
+  <div class="badge">B—26</div>
+  <div class="pills">
+    <a class="pill" href="#lab">Каталог</a>
+    <a class="pill" href="#about">О нас</a>
+    <a class="pill" href="#reach">Контакты</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="goo" data-goo="hero"></div>
+  <div class="wordmark">
+    <h1>Bruni</h1>
+    <div class="script">tech</div>
+  </div>
+  <div class="tag">Золотой стандарт гаджетов нового поколения</div>
+
+  <div class="stage">
+    <div class="float">
+      <div class="tilt" id="heroTilt">
+        <div class="phone">
+          <div class="scr">
+            <div class="holo"></div><div class="holo2"></div>
+            <div class="island"></div>
+            <div class="ui">
+              <div><div class="date" id="date">вторник, 10 ноября</div><div class="time" id="clock">19:36</div></div>
+              <div class="widgets">
+                <div class="wd">Батарея<b>98%</b></div>
+                <div class="wd">5G<b>2.4 Гб/с</b></div>
+                <div class="wd">Чип<b>B3 Neo</b></div>
+                <div class="wd">ИИ<b>On</b></div>
+              </div>
+            </div>
+            <div class="glare"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-foot">
+    <div class="scroll-ind"></div>
+    <div class="mono">Смартфоны · Ноутбуки · ПК · Носимые</div>
+    <div class="mono">↓ листай</div>
+  </div>
+</section>
+
+<div class="ticker"><div>
+  <span>НОВИНКИ 2026</span><em>fresh</em><span>✦ СКЛАДНЫЕ СМАРТФОНЫ</span><span>✦ RTX-СБОРКИ</span><em>hot</em><span>✦ OLED-НОУТБУКИ</span><span>✦ ИИ-ЧАСЫ</span><span>✦ ПОРТАТИВНЫЕ КОНСОЛИ</span>
+  <span>НОВИНКИ 2026</span><em>fresh</em><span>✦ СКЛАДНЫЕ СМАРТФОНЫ</span><span>✦ RTX-СБОРКИ</span><em>hot</em><span>✦ OLED-НОУТБУКИ</span><span>✦ ИИ-ЧАСЫ</span><span>✦ ПОРТАТИВНЫЕ КОНСОЛИ</span>
+</div></div>
+
+<!-- SHOWCASE -->
+<section class="show" id="show">
+  <h2>Тех, который<br>чувствуешь <em>feel it</em></h2>
+  <p class="lead">Мы отбираем устройства, которые выглядят как будущее и работают как надо. Листай витрину — каждая карточка живая.</p>
+  <div class="deck" id="deck">
+    <article class="card c1"><span class="mono">01 / Ноутбук</span><h3>Air&nbsp;Slab 14<br>OLED</h3><div class="art"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div><div class="price"><b>129 990 ₽</b><button class="btn">В корзину →</button></div></article>
+    <article class="card c2"><span class="mono">02 / Консоль</span><h3>Pocket&nbsp;Arc<br>Clear Edition</h3><div class="art"><div class="d-hand"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div><div class="price"><b>54 990 ₽</b><button class="btn">В корзину →</button></div></article>
+    <article class="card c3"><span class="mono">03 / Игровой ПК</span><h3>Tower&nbsp;X<br>RGB&nbsp;Pro</h3><div class="art"><div class="d-pc"><div class="fan"></div><div class="fan" style="animation-duration:.9s"></div></div></div><div class="price"><b>249 990 ₽</b><button class="btn y">В корзину →</button></div></article>
+    <article class="card c4"><span class="mono">04 / Часы</span><h3>Pulse&nbsp;Watch<br>Ultra</h3><div class="art"><div class="d-watch"><div class="ring"></div>72</div></div><div class="price"><b>39 990 ₽</b><button class="btn">В корзину →</button></div></article>
+    <article class="card c5"><span class="mono">05 / Аудио</span><h3>Bud&nbsp;Air<br>ANC 3</h3><div class="art"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div><div class="price"><b>17 990 ₽</b><button class="btn y">В корзину →</button></div></article>
+  </div>
+</section>
+
+<!-- MANIFESTO -->
+<section class="mani" id="about">
+  <div class="shape" style="width:380px;height:380px;background:var(--pink);right:6vw;top:60px"></div>
+  <div class="shape" style="width:300px;height:260px;background:var(--blue);left:-60px;bottom:40px;animation-delay:-3s"></div>
+  <div class="shape" style="width:220px;height:220px;background:var(--green);right:30vw;bottom:-40px;animation-delay:-6s"></div>
+  <div class="mono lbl">Кто мы</div>
+  <p id="maniText">Bruni Tech — это цифровая лаборатория, где железо встречается с дизайном. Мы тестируем, собираем и привозим технологии, которые делают каждый день чуть более похожим на будущее.</p>
+</section>
+
+<!-- LAB GRID -->
+<section class="lab" id="lab">
+  <div class="lab-head">
+    <h2>Лаборатория<br><em>gadgets</em></h2>
+    <div class="filters" id="filters">
+      <button class="act" data-f="all">Всё</button>
+      <button data-f="phone">Смартфоны</button>
+      <button data-f="pc">ПК и ноутбуки</button>
+      <button data-f="wear">Носимые</button>
+      <button data-f="game">Игры</button>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="item reveal" data-c="phone"><span class="mono num">B-01</span><span class="new">NEW</span>
+      <div class="dev"><div class="phone" style="width:130px;height:265px;border-radius:26px;padding:6px"><div class="scr" style="border-radius:21px"><div class="holo"></div><div class="island" style="width:44px;height:12px;top:8px"></div></div></div></div>
+      <div class="meta"><div><b>Neo Phone 7</b><span class="mono">6.7" · 1 ТБ</span></div><span class="mono">99 990 ₽</span></div></div>
+    <div class="item reveal" data-c="pc"><span class="mono num">B-02</span>
+      <div class="dev"><div class="d-laptop"><div class="lid"><div></div></div><div class="base"></div></div></div>
+      <div class="meta"><div><b>Air Slab 14</b><span class="mono">OLED · 32 ГБ</span></div><span class="mono">129 990 ₽</span></div></div>
+    <div class="item reveal" data-c="game"><span class="mono num">B-03</span><span class="new">HOT</span>
+      <div class="dev"><div class="d-hand" style="transform:scale(.85)"><div class="dp"></div><div class="s"><div class="holo"></div></div><div class="ab"><b></b><b></b><b></b><b></b></div></div></div>
+      <div class="meta"><div><b>Pocket Arc</b><span class="mono">120 Гц · Wi-Fi 7</span></div><span class="mono">54 990 ₽</span></div></div>
+    <div class="item reveal" data-c="wear"><span class="mono num">B-04</span>
+      <div class="dev"><div class="d-watch"><div class="ring"></div>72</div></div>
+      <div class="meta"><div><b>Pulse Watch</b><span class="mono">ЭКГ · 14 дней</span></div><span class="mono">39 990 ₽</span></div></div>
+    <div class="item reveal" data-c="pc"><span class="mono num">B-05</span><span class="new">NEW</span>
+      <div class="dev"><div class="d-pc"><div class="fan"></div><div class="fan"></div></div></div>
+      <div class="meta"><div><b>Tower X</b><span class="mono">RTX · 64 ГБ</span></div><span class="mono">249 990 ₽</span></div></div>
+    <div class="item reveal" data-c="wear"><span class="mono num">B-06</span>
+      <div class="dev"><div class="d-pods"><i></i><i style="transform:scaleX(-1) translateY(14px)"></i></div></div>
+      <div class="meta"><div><b>Bud Air ANC</b><span class="mono">40 ч · Hi-Res</span></div><span class="mono">17 990 ₽</span></div></div>
+  </div>
+</section>
+
+<!-- REACH OUT -->
+<section class="reach" id="reach">
+  <div class="goo" data-goo="reach"></div>
+  <div class="row" style="justify-content:flex-start"><span class="mono">Нужна консультация или сборка под задачу?</span></div>
+  <h2>На связи<em>let's talk</em></h2>
+  <div class="row">
+    <form onsubmit="event.preventDefault();this.querySelector('button').textContent='Отправлено ✓';">
+      <input type="email" required placeholder="твой e-mail">
+      <button class="btn y" type="submit">Написать нам →</button>
+    </form>
+    <div class="dots"><i></i><i></i><i></i></div>
+  </div>
+  <div class="foot mono">
+    <span>© 2026 Bruni Tech</span>
+    <span><a href="#lab">Каталог</a> · <a href="#about">О нас</a> · <a href="#top">Наверх ↑</a></span>
+    <span>hello@bruni.tech</span>
+  </div>
+</section>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const mouse = {x: innerWidth/2, y: innerHeight/2};
+  const cur = document.getElementById('cursor');
+  addEventListener('pointermove', e => {
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    cur.style.left = e.clientX + 'px'; cur.style.top = e.clientY + 'px';
+  });
+  document.querySelectorAll('a,button,.card,.item,input').forEach(el => {
+    el.addEventListener('pointerenter', () => cur.classList.add('big'));
+    el.addEventListener('pointerleave', () => cur.classList.remove('big'));
+  });
+
+  // clock
+  const pad = n => String(n).padStart(2,'0');
+  const tick = () => {
+    const d = new Date();
+    document.getElementById('clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    document.getElementById('date').textContent = d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  };
+  tick(); setInterval(tick, 10000);
+
+  // goo blobs: drifting metaballs + one that follows the cursor
+  const goos = [...document.querySelectorAll('.goo')].map(g => {
+    const n = g.dataset.goo === 'hero' ? 7 : 6;
+    const blobs = [];
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('i');
+      const r = 60 + Math.random()*130;
+      el.style.width = el.style.height = r + 'px';
+      g.appendChild(el);
+      blobs.push({el, r, ax: Math.random(), ay: Math.random(), sx: .15+Math.random()*.35, sy: .15+Math.random()*.35, ph: Math.random()*6.28});
+    }
+    const follow = document.createElement('i');
+    follow.style.width = follow.style.height = '110px';
+    g.appendChild(follow);
+    return {g, blobs, follow, fx: 0, fy: 0};
+  });
+
+  const tilt = document.getElementById('heroTilt');
+  const deck = document.getElementById('deck');
+  const show = document.getElementById('show');
+  const nav = document.getElementById('nav');
+  const reach = document.getElementById('reach');
+  let t0 = performance.now();
+
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    goos.forEach(o => {
+      const rect = o.g.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > innerHeight) return;
+      const W = rect.width, H = rect.height;
+      o.blobs.forEach((b, i) => {
+        const x = (b.ax*0.8 + 0.1)*W + Math.sin(t*b.sx + b.ph)*W*0.22 - b.r/2;
+        const y = (b.ay*0.8 + 0.1)*H + Math.cos(t*b.sy + b.ph*1.3)*H*0.2 - b.r/2;
+        const s = 1 + Math.sin(t*0.8 + i)*0.18;
+        b.el.style.transform = `translate(${x}px,${y}px) scale(${s})`;
+      });
+      const tx = mouse.x - rect.left - 55, ty = mouse.y - rect.top - 55;
+      o.fx += (tx - o.fx) * 0.12; o.fy += (ty - o.fy) * 0.12;
+      o.follow.style.transform = `translate(${o.fx}px,${o.fy}px)`;
+    });
+
+    // hero device tilt + scroll spin
+    const sy = scrollY;
+    const rx = (mouse.y/innerHeight - .5) * -24;
+    const ry = (mouse.x/innerWidth - .5) * 40 + Math.sin(t*0.6)*8 + sy*0.15;
+    tilt.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateY(${sy*0.25}px)`;
+
+    // horizontal deck driven by vertical scroll
+    const sr = show.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (innerHeight - sr.top) / (sr.height + innerHeight)));
+    const max = Math.max(0, deck.scrollWidth - innerWidth);
+    deck.style.transform = `translateX(${-p*max*1.1 + max*0.05}px)`;
+
+    // nav inversion over dark sections
+    const dark = [show, reach].some(s => { const r = s.getBoundingClientRect(); return r.top < 40 && r.bottom > 40; });
+    nav.classList.toggle('inv', dark);
+    document.body.classList.toggle('dark', [show, reach].some(s => { const r = s.getBoundingClientRect(); return r.top < mouse.y && r.bottom > mouse.y; }));
+
+    if (!reduce) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // manifesto: words light up with scroll
+  const mt = document.getElementById('maniText');
+  mt.innerHTML = mt.textContent.trim().split(/\s+/).map(w => `<span>${w}</span>`).join(' ');
+  const words = [...mt.children];
+  const lightWords = () => {
+    const r = mt.getBoundingClientRect();
+    const p = Math.min(1, Math.max(0, (innerHeight*0.85 - r.top) / (r.height + innerHeight*0.3)));
+    const k = Math.round(p * words.length);
+    words.forEach((w, i) => w.classList.toggle('on', i < k));
+  };
+  addEventListener('scroll', lightWords, {passive:true}); lightWords();
+
+  // reveal
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), {threshold:.15});
+  document.querySelectorAll('.reveal').forEach((el, i) => { el.style.transitionDelay = (i%3)*90 + 'ms'; io.observe(el); });
+
+  // filters
+  document.getElementById('filters').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    document.querySelectorAll('#filters button').forEach(x => x.classList.toggle('act', x === b));
+    const f = b.dataset.f;
+    document.querySelectorAll('.item').forEach(it => it.classList.toggle('hide', f !== 'all' && it.dataset.c !== f));
+  });
+})();
+</script>
+</body>
+</html>
