@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { pickPhoto, uploadPhoto, usePhotoUrl } from '@/lib/photos';
 import { useSettings } from '@/lib/settings';
-import { firstName, useTeam } from '@/lib/team';
+import { EMOJI, firstName, useTeam } from '@/lib/team';
 import { CHANNELS, ROLES, type Message } from '@/lib/types';
 
 /** Фото в сообщении: по нажатию — на весь экран. */
@@ -125,6 +125,11 @@ export default function Chat() {
     tap();
     setText((v) => v.replace(/@([A-Za-zА-Яа-яЁё0-9_-]*)$/, '@' + firstName(name) + ' '));
   };
+  const typers = team.typing.filter((x) => x.ch === ch);
+  const onType = (v: string) => {
+    setText(v);
+    if (!editing) team.setTyping(v.trim() ? ch : null);
+  };
   const attach = async (from: 'camera' | 'library') => {
     const uri = await pickPhoto(from);
     if (uri) setPhoto(uri);
@@ -159,6 +164,7 @@ export default function Chat() {
     }
     setText('');
     setPhoto(null);
+    team.setTyping(null);
     const q = quote;
     setQuote(null);
     if (!(await send(ch, v, q, path))) {
@@ -168,10 +174,58 @@ export default function Chat() {
     } else tap();
   };
 
+  // реакции: двойной тап — 👍
+  const lastTap = useRef<{ id: string; at: number } | null>(null);
+  const onTapMsg = (m: Message) => {
+    const now = Date.now();
+    if (lastTap.current && lastTap.current.id === m.id && now - lastTap.current.at < 320) {
+      lastTap.current = null;
+      tap('success');
+      team.toggleReaction(m.id, '👍', m.userId);
+    } else lastTap.current = { id: m.id, at: now };
+  };
+  const reactionsOf = (id: string) => {
+    const by = new Map<string, string[]>();
+    for (const r of team.reactions) if (r.message_id === id) by.set(r.emoji, [...(by.get(r.emoji) ?? []), r.user_id]);
+    return [...by.entries()].sort((a, b) => EMOJI.indexOf(a[0]) - EMOJI.indexOf(b[0]));
+  };
+  const Reactions = ({ m, me }: { m: Message; me: boolean }) => {
+    const list = reactionsOf(m.id);
+    if (!list.length) return null;
+    return (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, alignSelf: me ? 'flex-end' : 'flex-start', marginLeft: me ? 0 : 40 }}>
+        {list.map(([e, users]) => {
+          const mine = users.includes(team.me);
+          return (
+            <Pressable
+              key={e}
+              onPress={() => {
+                tap();
+                team.toggleReaction(m.id, e, m.userId);
+              }}
+              accessibilityLabel={`${e} ${users.length}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, backgroundColor: mine ? t.accent + '33' : t.card2, borderWidth: 1, borderColor: mine ? t.accent : 'transparent' }}
+            >
+              <T v="body" style={{ fontSize: 14 }}>
+                {e}
+              </T>
+              {users.length > 1 ? (
+                <T v="b" style={{ fontSize: 12 }}>
+                  {users.length}
+                </T>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderMsg = ({ item: m }: { item: Message }) => {
     const me = isMine(m);
     return (
-      <Pressable onLongPress={() => openMenu(m)} delayLongPress={350} style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '86%', marginVertical: 4 }}>
+      <View style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '86%', marginVertical: 4 }}>
+      <Pressable onPress={() => onTapMsg(m)} onLongPress={() => openMenu(m)} delayLongPress={350}>
         {me ? (
           <View>
           <View style={{ borderRadius: 20, borderTopRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 3, overflow: 'hidden', zIndex: 0 }}>
@@ -192,7 +246,10 @@ export default function Chat() {
           </View>
         ) : (
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
-            <Avatar name={m.author} />
+            <View>
+              <Avatar name={m.author} />
+              {m.userId && team.online.has(m.userId) ? <View style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: t.ok, borderWidth: 2, borderColor: t.bg }} /> : null}
+            </View>
             <Glass radius={20} style={{ borderBottomLeftRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 4, flexShrink: 1 }}>
               <T v="small" style={{ fontSize: 12 }}>
                 <T v="b" style={{ fontSize: 12, color: t.accent2 }}>
@@ -207,6 +264,8 @@ export default function Chat() {
           </View>
         )}
       </Pressable>
+      {Reactions({ m, me })}
+      </View>
     );
   };
 
@@ -305,6 +364,11 @@ export default function Chat() {
               </Pressable>
             </Glass>
           ) : null}
+          {typers.length ? (
+            <T v="small" style={{ paddingHorizontal: 10, fontSize: 12 }}>
+              {typers.map((x) => firstName(x.name)).join(', ')} {typers.length > 1 ? 'печатают' : 'печатает'}…
+            </T>
+          ) : null}
           {hints.length ? (
             <ScrollView horizontal keyboardShouldPersistTaps="always" showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {hints.map((p) => (
@@ -343,7 +407,7 @@ export default function Chat() {
             <TextInput
               ref={input}
               value={text}
-              onChangeText={setText}
+              onChangeText={onType}
               placeholder="Сообщение · @имя"
               placeholderTextColor={t.mute}
               multiline
@@ -367,6 +431,28 @@ export default function Chat() {
               <T v="body" numberOfLines={3}>
                 {menu?.text}
               </T>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+              {EMOJI.map((e) => {
+                const on = !!menu && team.reactions.some((r) => r.message_id === menu.id && r.user_id === team.me && r.emoji === e);
+                return (
+                  <Pressable
+                    key={e}
+                    onPress={() => {
+                      if (!menu) return;
+                      tap('success');
+                      team.toggleReaction(menu.id, e, menu.userId);
+                      setMenu(null);
+                    }}
+                    accessibilityLabel={`Реакция ${e}`}
+                    style={({ pressed }) => ({ width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: on ? t.accent + '33' : pressed ? t.line : t.card2, transform: [{ scale: pressed ? 1.2 : 1 }] })}
+                  >
+                    <T v="body" style={{ fontSize: 24 }}>
+                      {e}
+                    </T>
+                  </Pressable>
+                );
+              })}
             </View>
             {[
               { key: 'reply', label: 'Ответить', icon: 'chat', show: true },

@@ -8,6 +8,8 @@ import { dm, fmt, greeting, money, shortDate, today, tomorrow } from '@/lib/form
 import { pathFor, SECTION_PATH } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
 import { useMyTasks } from '@/lib/team';
+import { HeroesCard } from '@/components/Heroes';
+import { Weather } from '@/components/Weather';
 import { updatedLabel, useSheets } from '@/lib/sheets';
 import { ROLE_SECTIONS, STATUSES, type Section as Sec } from '@/lib/types';
 
@@ -55,6 +57,9 @@ export default function Home() {
       ) : loading ? (
         <Banner text="Загружаю данные…" />
       ) : null}
+      <Appear i={i++}>
+        <Weather />
+      </Appear>
       {myTasks.length ? (
         <Appear i={i++}>
           <Card onPress={() => router.push('/tasks')} tone={lateTasks ? 'bad' : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -229,6 +234,9 @@ export default function Home() {
         </Card>
       </Appear>
 
+      <Appear i={i++}>
+        <HeroesCard />
+      </Appear>
       <Section
         right={
           d.signals.length ? (

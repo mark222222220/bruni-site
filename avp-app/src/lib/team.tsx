@@ -16,11 +16,13 @@ export type Move = { id: string; item_id: string; item_name: string; qty: number
 export type Mark = { order_no: string; status: Status; author: string; user_id: string; at: number };
 export type Read = { user_id: string; channel: string; at: number };
 export type Note = { id: string; client: string; text: string; author: string; user_id: string; at: number };
+export type Reaction = { message_id: string; user_id: string; emoji: string; at: number };
+export const EMOJI = ['👍', '🔥', '❤️', '😂', '😮', '✅'];
 
-type Data = { people: Person[]; tasks: Task[]; moves: Move[]; marks: Mark[]; reads: Read[]; notes: Note[] };
-const EMPTY: Data = { people: [], tasks: [], moves: [], marks: [], reads: [], notes: [] };
+type Data = { people: Person[]; tasks: Task[]; moves: Move[]; marks: Mark[]; reads: Read[]; notes: Note[]; reactions: Reaction[] };
+const EMPTY: Data = { people: [], tasks: [], moves: [], marks: [], reads: [], notes: [], reactions: [] };
 const TABLES = ['tasks', 'moves', 'marks', 'reads', 'notes'] as const;
-const DB: Record<(typeof TABLES)[number], string> = { tasks: 'tasks', moves: 'stock_moves', marks: 'order_marks', reads: 'chat_reads', notes: 'client_notes' };
+const DB: Record<(typeof TABLES)[number] | 'reactions', string> = { tasks: 'tasks', moves: 'stock_moves', marks: 'order_marks', reads: 'chat_reads', notes: 'client_notes', reactions: 'message_reactions' };
 const LOCAL = 'avp.team.v1';
 
 type Ctx = Data & {
@@ -35,6 +37,12 @@ type Ctx = Data & {
   markRead: (channel: string, at: number) => void;
   addNote: (client: string, text: string) => Promise<boolean>;
   removeNote: (id: string) => Promise<boolean>;
+  toggleReaction: (messageId: string, emoji: string, authorId?: string) => void;
+  /** кто сейчас в приложении */
+  online: Set<string>;
+  /** кто печатает: канал чата */
+  typing: { id: string; name: string; ch: string }[];
+  setTyping: (ch: string | null) => void;
   notify: (to: Person[], title: string, body: string, data: Record<string, unknown>) => void;
 };
 const TeamCtx = createContext<Ctx | null>(null);
@@ -66,6 +74,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       sb.from('order_marks').select('*'),
       sb.from('chat_reads').select('*'),
       sb.from('client_notes').select('*').order('at', { ascending: false }).limit(500),
+      sb.from('message_reactions').select('*').order('at', { ascending: false }).limit(2000),
     ]);
     // таблиц нет (SQL 0.7 не выполнен) — работаем без них
     setMissing(rest.slice(0, 4).some((r) => r.error && /does not exist|schema cache|relation/i.test(r.error.message)));
@@ -77,6 +86,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       marks: pick<Mark>(rest[2]).map(num),
       reads: pick<Read>(rest[3]).map(num),
       notes: pick<Note>(rest[4]).map(num),
+      reactions: pick<Reaction>(rest[5]).map(num),
     });
   }, [s.name, s.role]);
 
@@ -99,6 +109,54 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       sb.removeChannel(ch);
     };
   }, [load]);
+
+  /* Кто в сети и кто печатает — через живой канал, в базе не хранится. */
+  const [online, setOnline] = useState<Set<string>>(new Set());
+  const [typing, setTypingList] = useState<{ id: string; name: string; ch: string }[]>([]);
+  const presence = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null);
+  const typingCh = useRef<string | null>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!supabase || !profile) return;
+    const sb = supabase;
+    const ch = sb.channel('avp-presence', { config: { presence: { key: profile.id } } });
+    const sync = () => {
+      const st = ch.presenceState<{ name: string; typing: string | null; active: boolean }>();
+      const ids = new Set<string>();
+      const ty: { id: string; name: string; ch: string }[] = [];
+      for (const [id, metas] of Object.entries(st)) {
+        const m = metas[metas.length - 1];
+        if (m?.active) ids.add(id);
+        if (m?.typing && id !== profile.id) ty.push({ id, name: m.name, ch: m.typing });
+      }
+      setOnline(ids);
+      setTypingList(ty);
+    };
+    ch.on('presence', { event: 'sync' }, sync);
+    sb.auth.getSession().then(({ data }) => {
+      if (data.session) sb.realtime.setAuth(data.session.access_token);
+      ch.subscribe((status) => {
+        if (status === 'SUBSCRIBED') ch.track({ name: profile.name, typing: null, active: AppState.currentState === 'active' });
+      });
+    });
+    presence.current = ch;
+    const app = AppState.addEventListener('change', (st) => ch.track({ name: profile.name, typing: null, active: st === 'active' }));
+    return () => {
+      app.remove();
+      presence.current = null;
+      sb.removeChannel(ch);
+    };
+  }, [profile]);
+  const setTyping = useCallback(
+    (ch: string | null) => {
+      if (typingTimer.current) clearTimeout(typingTimer.current);
+      if (ch) typingTimer.current = setTimeout(() => setTyping(null), 4000);
+      if (typingCh.current === ch) return;
+      typingCh.current = ch;
+      presence.current?.track({ name: myName, typing: ch, active: true });
+    },
+    [myName],
+  );
 
   /** Сначала меняем экран, потом базу; при ошибке перечитываем. */
   const apply = useCallback(
@@ -190,9 +248,24 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   );
   const removeNote = useCallback(async (id: string) => !(await apply((p) => ({ ...p, notes: p.notes.filter((x) => x.id !== id) }), () => supabase!.from('client_notes').delete().eq('id', id))), [apply]);
 
+  const toggleReaction = useCallback(
+    (messageId: string, emoji: string, authorId?: string) => {
+      const had = dRef.current.reactions.some((r) => r.message_id === messageId && r.user_id === me && r.emoji === emoji);
+      const row: Reaction = { message_id: messageId, user_id: me, emoji, at: Date.now() };
+      apply(
+        (p) => ({ ...p, reactions: had ? p.reactions.filter((r) => !(r.message_id === messageId && r.user_id === me && r.emoji === emoji)) : [row, ...p.reactions] }),
+        () => (had ? supabase!.from('message_reactions').delete().match({ message_id: messageId, user_id: me, emoji }) : supabase!.from('message_reactions').insert(row)),
+      ).then((err) => {
+        const author = dRef.current.people.find((p) => p.id === authorId);
+        if (!err && !had && author) notify([author], `${firstName(myName)} ${emoji}`, 'отреагировал(а) на ваше сообщение', { kind: 'chat' });
+      });
+    },
+    [apply, me, myName, notify],
+  );
+
   const value = useMemo(
-    () => ({ ...d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify }),
-    [d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify],
+    () => ({ ...d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping }),
+    [d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping],
   );
   return <TeamCtx.Provider value={value}>{children}</TeamCtx.Provider>;
 }

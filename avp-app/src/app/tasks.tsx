@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { celebrate } from '@/components/Confetti';
+import { HeroesCard } from '@/components/Heroes';
 import { Appear, Banner, Button, Card, Empty, Icon, Pill, Screen, Segmented, T, styles } from '@/components/ui';
 import { dm, today } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
@@ -30,6 +32,7 @@ function TaskRow({ x }: { x: Task }) {
         onPress={async () => {
           if (!canTick) return;
           tap(x.done ? 'light' : 'success');
+          if (!x.done) celebrate(['Готово! 🎉', 'Красавчик! 💪', 'Минус одна задача ✅', 'Так держать! 🔥'][Math.floor(Math.random() * 4)]);
           await toggleTask(x);
         }}
         accessibilityRole="checkbox"
@@ -93,6 +96,7 @@ export default function Tasks() {
   return (
     <Screen kicker="Команда" title="Задачи" subtitle={groups.mine.length ? `${groups.mine.length} на вас${late ? ` · ${late} просрочено` : ''}` : 'Ваших задач нет'} back>
       {missing ? <Banner tone="bad" text="Задачи ещё не включены в базе. Руководителю нужно один раз выполнить SQL 0.7 в Supabase." /> : null}
+      <HeroesCard />
       <Segmented
         value={f}
         onChange={setF}

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Image, Pressable, View } from 'react-native';
+import { celebrate } from '@/components/Confetti';
 import { Button, Empty, Field, Glass, Icon, Sheet, SheetHeader, T, styles } from '@/components/ui';
 import { useData } from '@/lib/data';
 import { fmt, parseNum } from '@/lib/format';
@@ -44,6 +45,7 @@ export default function Receipt() {
       // в чат «Склад» — чтобы все видели приход и накладную
       await send('stock', `📦 Приход: ${x.name} +${fmt(q, q % 1 ? 1 : 0)} ${x.unit}${note.trim() ? `\n${note.trim()}` : ''}`, null, path);
       tap('success');
+      celebrate(`Принято: +${fmt(q, q % 1 ? 1 : 0)} ${x.unit} 📦`);
       router.back();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Не сохранилось');

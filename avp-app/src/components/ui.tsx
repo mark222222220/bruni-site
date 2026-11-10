@@ -20,11 +20,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { celebrate } from '@/lib/fun';
 import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '0.7.0';
+export const APP_BUILD = '0.8.0';
+const SECRETS = ['Гласс-Хаус Крым — сила! 🏆', 'Сделано с любовью к стеклу 🪟', 'Ты нашёл пасхалку! 🥚', 'Стекло прозрачное, цифры тоже 😎'];
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 
@@ -517,8 +519,19 @@ export function Screen({
   scroll?: boolean;
   right?: ReactNode;
 }) {
-  const { t, s } = useSettings();
+  const { t, s, tap } = useSettings();
   const ins = useSafeAreaInsets();
+  // пасхалка: 7 быстрых нажатий на логотип
+  const secret = useRef({ n: 0, at: 0 });
+  const secretTap = () => {
+    const now = Date.now();
+    secret.current = now - secret.current.at < 600 ? { n: secret.current.n + 1, at: now } : { n: 1, at: now };
+    if (secret.current.n >= 7) {
+      secret.current.n = 0;
+      tap('success');
+      celebrate(SECRETS[Math.floor(Math.random() * SECRETS.length)]);
+    }
+  };
   const head = (
     <View style={{ paddingTop: ins.top + 8 + (Platform.OS === 'web' ? 56 : 0), paddingBottom: compact ? 8 : 14, gap: 18 }}>
       <View style={styles.row}>
@@ -526,7 +539,9 @@ export function Screen({
           <IconButton icon="back" label="Назад" onPress={() => (router.canGoBack() ? router.back() : router.replace('/more'))} />
         ) : (
           <View style={[styles.row, { gap: 10 }]}>
-            <Logo />
+            <Pressable onPress={secretTap} accessibilityLabel="AVP" hitSlop={6}>
+              <Logo />
+            </Pressable>
             <View>
               <T v="b" style={{ fontSize: 15, letterSpacing: 0.4 }}>
                 AVP

@@ -3,7 +3,9 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Confetti } from '@/components/Confetti';
 import { Lock } from '@/components/Lock';
+import { Shake } from '@/components/Shake';
 import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
 import { AuthProvider, useAuth } from '@/lib/auth';
@@ -48,6 +50,8 @@ function Root() {
         <Stack.Screen name="new-task" options={{ ...sheet, sheetAllowedDetents: [0.75, 1] }} />
         <Stack.Screen name="receipt" options={{ ...sheet, sheetAllowedDetents: [1] }} />
       </Stack>
+      <Shake />
+      <Confetti />
     </DataProvider>
     </TeamProvider>
     </Lock>

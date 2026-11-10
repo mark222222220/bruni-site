@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { celebrate } from '@/components/Confetti';
 import { Button, Empty, Glass, Pill, Sheet, SheetHeader, T, styles } from '@/components/ui';
 import { statusIndex, useData } from '@/lib/data';
 import { dm, fmt, today } from '@/lib/format';
@@ -36,6 +37,8 @@ export default function OrderCard() {
       if (e) return setErr(e);
     } else if (!(await patch('orders', o.id, { status: st }))) return;
     tap('success');
+    if (st === 'shipped') celebrate(`Заказ №${o.no} отгружен 🚚`);
+    else if (st === 'ready') celebrate(`Заказ №${o.no} готов ✨`);
   };
   const late = o.status !== 'shipped' && o.ship < today();
   const row = (k: string, v: string, bad?: boolean) => (
