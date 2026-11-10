@@ -4,15 +4,18 @@ import { Pressable, View } from 'react-native';
 import { Appear, Banner, Card, CountUp, HeroCard, IconBadge, Press, Ring, Screen, Section, Spark, T, styles } from '@/components/ui';
 import { statusIndex, useData, useDerived } from '@/lib/data';
 import { CASH_HISTORY } from '@/lib/demo';
-import { dm, fmt, greeting, money, shortDate, tomorrow } from '@/lib/format';
+import { dm, fmt, greeting, money, shortDate, today, tomorrow } from '@/lib/format';
 import { pathFor, SECTION_PATH } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
+import { useMyTasks } from '@/lib/team';
 import { updatedLabel, useSheets } from '@/lib/sheets';
 import { ROLE_SECTIONS, STATUSES, type Section as Sec } from '@/lib/types';
 
 export default function Home() {
   const { s, t } = useSettings();
-  const { kind, loading, error } = useData();
+  const { kind, loading, error, offlineAt } = useData();
+  const myTasks = useMyTasks();
+  const lateTasks = myTasks.filter((x) => x.due && x.due < today()).length;
   const d = useDerived();
   const SHEETS = useSheets();
   const [heroW, setHeroW] = useState(0);
@@ -45,7 +48,27 @@ export default function Home() {
 
   return (
     <Screen kicker={SHEETS ? `данные на ${updatedLabel(SHEETS.generatedAt)}` : `${shortDate()}${kind === 'local' ? ' · демо' : ''}`} title={greeting() + (s.name ? `,\n${s.name.split(' ')[0]}` : '')}>
-      {error ? <Banner tone="bad" text={`Нет связи с базой: ${error}`} /> : loading ? <Banner text="Загружаю данные…" /> : null}
+      {offlineAt ? (
+        <Banner tone="bad" text={`Нет связи — показаны сохранённые данные от ${new Date(offlineAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`} />
+      ) : error ? (
+        <Banner tone="bad" text={`Нет связи с базой: ${error}`} />
+      ) : loading ? (
+        <Banner text="Загружаю данные…" />
+      ) : null}
+      {myTasks.length ? (
+        <Appear i={i++}>
+          <Card onPress={() => router.push('/tasks')} tone={lateTasks ? 'bad' : undefined} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <IconBadge icon="tasks" tone={lateTasks ? 'bad' : 'accent'} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <T v="b">Ваши задачи: {myTasks.length}</T>
+              <T v="small" numberOfLines={1}>
+                {lateTasks ? `${lateTasks} просрочено · ` : ''}
+                {myTasks[0].title}
+              </T>
+            </View>
+          </Card>
+        </Appear>
+      ) : null}
 
       {can('money') ? (
         <Appear i={i++}>

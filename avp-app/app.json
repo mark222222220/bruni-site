@@ -3,7 +3,7 @@
     "name": "AVP system",
     "slug": "avp-system",
     "scheme": "avp",
-    "version": "0.4.0",
+    "version": "0.7.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -41,7 +41,21 @@
         }
       ],
       "expo-font",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AVP открывает галерею, чтобы отправить фото в чат команды или приложить накладную.",
+          "cameraPermission": "AVP снимает фото для чата команды и накладные при приходе на склад."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "AVP спрашивает Face ID, чтобы цифры завода не увидел посторонний."
+        }
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": false

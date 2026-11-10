@@ -1,8 +1,12 @@
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { View } from 'react-native';
-import { Icon, Item, List, Pill, Screen, Section, T } from '@/components/ui';
+import { APP_BUILD, Icon, Item, List, Pill, Screen, Section, T } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
-import { useData } from '@/lib/data';
+import { useData, useDerived } from '@/lib/data';
+import { shareReport } from '@/lib/report';
+import { getSheets } from '@/lib/sheets';
+import { useMyTasks } from '@/lib/team';
 import { pathFor } from '@/lib/nav';
 import { useSettings } from '@/lib/settings';
 import { ROLE_SECTIONS, ROLES, type Section as Sec } from '@/lib/types';
@@ -27,11 +31,43 @@ function Badge({ icon }: { icon: string }) {
 
 export default function More() {
   const { s } = useSettings();
-  const { kind } = useData();
+  const { kind, snap } = useData();
+  const d = useDerived();
   const auth = useAuth();
+  const my = useMyTasks();
+  const [pdf, setPdf] = useState('');
   const extra = ROLE_SECTIONS[s.role].slice(4);
+  const makePdf = async () => {
+    setPdf('Готовлю отчёт…');
+    try {
+      await shareReport({ snap, sheets: getSheets(), role: s.role, name: s.name, balance: d.balance, due: d.due });
+      setPdf('');
+    } catch (e) {
+      setPdf(e instanceof Error ? e.message : 'Не получилось');
+    }
+  };
   return (
     <Screen title="Ещё" subtitle="Все разделы">
+      <List>
+        <Item first onPress={() => router.push('/tasks')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Badge icon="tasks" />
+            <View style={{ flex: 1 }}>
+              <T v="b">Задачи</T>
+              <T v="small">{my.length ? `${my.length} на вас` : 'Поручения команде'}</T>
+            </View>
+          </View>
+        </Item>
+        <Item onPress={makePdf}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Badge icon="doc" />
+            <View style={{ flex: 1 }}>
+              <T v="b">Отчёт PDF</T>
+              <T v="small">{pdf || 'Деньги, заказы, склад — переслать одним файлом'}</T>
+            </View>
+          </View>
+        </Item>
+      </List>
       {extra.length ? (
         <List>
           {extra.map((x, i) => (
@@ -66,7 +102,7 @@ export default function More() {
         {auth.required ? <Item title="Выйти" sub="на этом телефоне" onPress={auth.signOut} /> : null}
       </List>
       <T v="small" style={{ textAlign: 'center' }}>
-        AVP system · версия 0.5 · Гласс-Хаус Крым
+        AVP system · версия {APP_BUILD} · Гласс-Хаус Крым
       </T>
     </Screen>
   );

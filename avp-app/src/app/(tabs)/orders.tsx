@@ -67,7 +67,7 @@ function OrderCard({ o }: { o: Order }) {
 }
 
 export default function Orders() {
-  const { snap, loading } = useData();
+  const { snap, loading, offlineAt } = useData();
   const { s, t } = useSettings();
   const [f, setF] = useState<F>('work');
   const [q, setQ] = useState('');
@@ -105,7 +105,7 @@ export default function Orders() {
           { value: 'all', label: `Все · ${n('all')}` },
         ]}
       />
-      {loading ? <Banner text="Загружаю заказы…" /> : null}
+      {offlineAt ? <Banner tone="bad" text={`Нет связи — данные от ${new Date(offlineAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`} /> : loading ? <Banner text="Загружаю заказы…" /> : null}
       {list.length ? (
         list.map((o, i) => (
           <Appear key={o.id} i={i}>

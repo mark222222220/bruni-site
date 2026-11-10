@@ -3,12 +3,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Lock } from '@/components/Lock';
 import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { NotificationsBridge } from '@/lib/notifications';
 import { DataProvider } from '@/lib/data';
 import { SettingsProvider, useSettings } from '@/lib/settings';
+import { TeamProvider } from '@/lib/team';
 
 const sheet = {
   presentation: 'formSheet' as const,
@@ -26,6 +28,8 @@ function Root() {
   if (auth.required && (!auth.session || !auth.profile)) return <Login />;
   if (!auth.required && !s.name) return <Onboarding />;
   return (
+    <Lock>
+    <TeamProvider>
     <DataProvider>
       {auth.required ? <NotificationsBridge /> : null}
       <StatusBar style={t.dark ? 'light' : 'dark'} />
@@ -40,8 +44,13 @@ function Root() {
         <Stack.Screen name="new-order" options={{ ...sheet, sheetAllowedDetents: [1] }} />
         <Stack.Screen name="client/[id]" options={{ ...sheet, sheetAllowedDetents: [1] }} />
         <Stack.Screen name="new-payment" options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
+        <Stack.Screen name="tasks" />
+        <Stack.Screen name="new-task" options={{ ...sheet, sheetAllowedDetents: [0.75, 1] }} />
+        <Stack.Screen name="receipt" options={{ ...sheet, sheetAllowedDetents: [1] }} />
       </Stack>
     </DataProvider>
+    </TeamProvider>
+    </Lock>
   );
 }
 

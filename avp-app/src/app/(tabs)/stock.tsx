@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
-import { Appear, Banner, Bar, Button, Card, CountUp, Empty, IconBadge, Pill, Screen, Segmented, Stepper, T, styles } from '@/components/ui';
+import { Pressable, View } from 'react-native';
+import { Appear, Banner, Bar, Button, Card, CountUp, Empty, Icon, IconBadge, Pill, Screen, Segmented, Stepper, T, styles } from '@/components/ui';
 import { isLow, needToOrder, useData, useDerived } from '@/lib/data';
 import { money } from '@/lib/format';
 import { fmt } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
 
 export default function Stock() {
-  const { snap, patch, send, loading } = useData();
+  const { snap, patch, send, loading, offlineAt } = useData();
   const { low } = useDerived();
-  const { t, tap } = useSettings();
+  const { s, t, tap } = useSettings();
+  const canReceive = s.role === 'boss' || s.role === 'store';
   const [mode, setMode] = useState<'left' | 'order'>('left');
   const all = snap.stock.slice().sort((a, b) => a.sort - b.sort);
   const items = all.filter((x) => x.status !== 'Нет расхода');
@@ -54,7 +55,7 @@ export default function Stock() {
           { value: 'order', label: low.length ? `Заявка · ${low.length}` : 'Заявка' },
         ]}
       />
-      {loading ? <Banner text="Загружаю остатки…" /> : null}
+      {offlineAt ? <Banner tone="bad" text={`Нет связи — данные от ${new Date(offlineAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`} /> : loading ? <Banner text="Загружаю остатки…" /> : null}
       {mode === 'left' ? (
         items.length ? (
           items.map((x, i) => {
@@ -97,6 +98,24 @@ export default function Stock() {
                     <T v="small">
                       расход {fmt(x.weekly ?? 0)} {x.unit} в неделю · на складе {money(x.value ?? 0)} ₽
                     </T>
+                  ) : null}
+                  {x.received ? (
+                    <T v="small" style={{ color: t.ok }}>
+                      +{fmt(x.received, x.received % 1 ? 1 : 0)} {x.unit} принято через приложение
+                    </T>
+                  ) : null}
+                  {canReceive ? (
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/receipt', params: { id: x.id } })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Приход: ${x.name}`}
+                      style={({ pressed }) => [styles.row, { gap: 8, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: pressed ? t.line : t.field }]}
+                    >
+                      <Icon name="plus" size={16} color={t.accent} stroke={2.4} />
+                      <T v="b" style={{ fontSize: 13 }}>
+                        Приход
+                      </T>
+                    </Pressable>
                   ) : null}
                 </Card>
               </Appear>

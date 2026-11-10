@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Pressable, View } from 'react-native';
+import { ForecastCard } from '@/components/Forecast';
 import { Appear, Button, Card, CountUp, Empty, Pill, Screen, T, styles } from '@/components/ui';
 import { useData, useDerived } from '@/lib/data';
 import { dm, fmt, money, today } from '@/lib/format';
@@ -51,6 +52,10 @@ export function MoneyScreen({ back }: { back?: boolean }) {
             {ok ? `Хватает: после платежей останется ${money(d.balance - d.due)} ₽` : `Не хватает ${money(d.due - d.balance)} ₽`}
           </T>
         </Card>
+      </Appear>
+
+      <Appear i={i++}>
+        <ForecastCard balance={d.balance} payments={snap.payments} orders={snap.orders} />
       </Appear>
 
       {days.length ? (

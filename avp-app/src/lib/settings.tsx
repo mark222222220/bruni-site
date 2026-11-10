@@ -15,6 +15,8 @@ export type Settings = {
   badges: boolean;
   /** уведомления о новых сообщениях в чате */
   notify: boolean;
+  /** вход по Face ID / Touch ID */
+  lock: boolean;
   thr: number;
   name: string;
   role: Role;
@@ -29,6 +31,7 @@ export const DEFAULTS: Settings = {
   haptics: true,
   badges: true,
   notify: true,
+  lock: false,
   thr: 15,
   name: '',
   role: 'boss',

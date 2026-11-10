@@ -47,13 +47,23 @@ export async function sendPush(tokens: string[], title: string, body: string, da
   }).catch(() => {});
 }
 
-/** Уведомить коллег о новом сообщении в чате. */
+/** Уведомить коллег о новом сообщении в чате. Упомянутым через @Имя — отдельное уведомление. */
 export async function notifyTeamAboutMessage(myId: string, myName: string, channel: string, text: string) {
   if (!supabase) return;
   const { data } = await supabase.from('profiles').select('*').neq('id', myId);
-  const tokens = ((data ?? []) as { push_token?: string }[]).map((p) => p.push_token ?? '').filter(Boolean);
+  const people = (data ?? []) as { name?: string; push_token?: string }[];
   const chName = CHANNELS.find((c) => c.id === channel)?.name ?? 'Чат';
-  await sendPush(tokens, `${myName} · ${chName}`, text, { kind: 'chat', channel });
+  const low = text.toLowerCase();
+  const isMentioned = (p: { name?: string }) => {
+    const first = (p.name ?? '').trim().split(/\s+/)[0]?.toLowerCase();
+    return !!first && (low.includes('@' + first) || low.includes('@все'));
+  };
+  const tokens = (list: typeof people) => list.map((p) => p.push_token ?? '').filter(Boolean);
+  const mentioned = people.filter(isMentioned);
+  await Promise.all([
+    sendPush(tokens(mentioned), `${myName} упомянул(а) вас · ${chName}`, text, { kind: 'chat', channel }),
+    sendPush(tokens(people.filter((p) => !isMentioned(p))), `${myName} · ${chName}`, text, { kind: 'chat', channel }),
+  ]);
 }
 
 /** Регистрирует телефон для уведомлений после входа и открывает нужный чат по нажатию на уведомление. */
@@ -81,6 +91,10 @@ export function NotificationsBridge() {
     const open = (r: Notifications.NotificationResponse | null) => {
       const d = r?.notification.request.content.data as { kind?: string; channel?: string } | undefined;
       if (d?.kind === 'chat') router.navigate({ pathname: '/chat', params: { ch: d.channel ?? 'general' } });
+      else if (d?.kind === 'task') router.navigate('/tasks');
+      else if (d?.kind === 'order') router.navigate('/orders');
+      else if (d?.kind === 'stock') router.navigate('/stock');
+      else if (d?.kind === 'digest') router.navigate('/');
     };
     Notifications.getLastNotificationResponseAsync().then(open).catch(() => {});
     const sub = Notifications.addNotificationResponseReceivedListener(open);

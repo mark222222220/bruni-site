@@ -1,17 +1,20 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { Button, Empty, Glass, Pill, Sheet, SheetHeader, T, styles } from '@/components/ui';
 import { statusIndex, useData } from '@/lib/data';
 import { dm, fmt, today } from '@/lib/format';
 import { useSettings } from '@/lib/settings';
+import { useTeam } from '@/lib/team';
 import { STATUSES } from '@/lib/types';
 
 export default function OrderCard() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { snap, patch, remove } = useData();
   const { s, t, tap } = useSettings();
+  const { markOrder } = useTeam();
   const [sure, setSure] = useState(false);
+  const [err, setErr] = useState('');
   const o = snap.orders.find((x) => x.id === id);
   if (!o)
     return (
@@ -22,7 +25,18 @@ export default function OrderCard() {
     );
   const i = statusIndex(o.status);
   const next = STATUSES[i + 1];
-  const canMove = !o.fromSheet && (s.role === 'boss' || s.role === 'store' || (s.role === 'sales' && o.status === 'ready'));
+  const canMove = s.role === 'boss' || s.role === 'store' || (s.role === 'sales' && o.status === 'ready');
+  const canPick = s.role === 'boss' || s.role === 'store';
+  const setStatus = async (st: (typeof STATUSES)[number]['id']) => {
+    if (st === o.status) return;
+    setErr('');
+    tap();
+    if (o.fromSheet) {
+      const e = await markOrder(String(o.no), st, o.client);
+      if (e) return setErr(e);
+    } else if (!(await patch('orders', o.id, { status: st }))) return;
+    tap('success');
+  };
   const late = o.status !== 'shipped' && o.ship < today();
   const row = (k: string, v: string, bad?: boolean) => (
     <View style={[styles.row, { justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 0.5, borderTopColor: t.line }]}>
@@ -47,7 +61,7 @@ export default function OrderCard() {
       </Glass>
       <Glass style={{ padding: 16, gap: 2 }}>
         {STATUSES.map((st, k) => (
-          <View key={st.id} style={[styles.row, { paddingVertical: 7 }]}>
+          <Pressable key={st.id} disabled={!canPick} onPress={() => setStatus(st.id)} accessibilityRole="button" accessibilityLabel={`Статус: ${st.name}`} style={[styles.row, { paddingVertical: 7 }]}>
             <View
               style={{
                 width: 24,
@@ -69,16 +83,24 @@ export default function OrderCard() {
             <T v={k === i ? 'b' : 'body'} style={{ color: k <= i ? t.fg : t.mute }}>
               {st.name}
             </T>
-          </View>
+          </Pressable>
         ))}
+        {o.markedBy ? (
+          <T v="small" style={{ marginTop: 6 }}>
+            Отметил(а) {o.markedBy} · {new Date(o.markedAt ?? 0).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+          </T>
+        ) : canPick ? (
+          <T v="small" style={{ marginTop: 6 }}>
+            Нажмите на этап, чтобы отметить — менеджер и руководитель получат уведомление
+          </T>
+        ) : null}
       </Glass>
+      {err ? <T v="small" style={{ color: t.bad }}>{err}</T> : null}
       {next && canMove ? (
         <View style={{ flexDirection: 'row' }}>
           <Button
             title={`Перевести в «${next.name}»`}
-            onPress={async () => {
-              if (await patch('orders', o.id, { status: next.id })) tap('success');
-            }}
+            onPress={() => setStatus(next.id)}
           />
         </View>
       ) : null}

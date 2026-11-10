@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Button, Field, Glass, Item, List, Screen, Section, Stepper, T, Toggle } from '@/components/ui';
+import { biometricsAvailable, checkBiometrics } from '@/components/Lock';
 import { useData } from '@/lib/data';
 import { useSettings, type Accent, type Skin } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
@@ -26,6 +27,13 @@ export default function Settings() {
   const { kind, resetDemo } = useData();
   const [name, setName] = useState(s.name);
   const [sure, setSure] = useState<'reset' | 'demo' | null>(null);
+  const [bioMsg, setBioMsg] = useState('');
+  const toggleLock = async (v: boolean) => {
+    setBioMsg('');
+    if (v && !(await biometricsAvailable())) return setBioMsg('На телефоне не настроен Face ID или Touch ID');
+    // включение и выключение — только после проверки лица
+    if (await checkBiometrics(v ? 'Включить вход по Face ID' : 'Выключить вход по Face ID')) set({ lock: v });
+  };
 
   return (
     <Screen kicker="Приложение" title="Настройки" subtitle="Оформление и удобство" back>
@@ -79,7 +87,8 @@ export default function Settings() {
         <Item first title="Крупный текст" sub="для чтения в цеху" right={<Toggle label="Крупный текст" value={s.big} onChange={(v) => set({ big: v })} />} />
         <Item title="Вибрация при нажатиях" sub="лёгкий отклик кнопок" right={<Toggle label="Вибрация" value={s.haptics} onChange={(v) => set({ haptics: v })} />} />
         <Item title="Счётчик непрочитанных" sub="цифра на вкладке «Чаты»" right={<Toggle label="Счётчик" value={s.badges} onChange={(v) => set({ badges: v })} />} />
-        <Item title="Уведомления о сообщениях" sub="на экран телефона, даже когда AVP закрыт" right={<Toggle label="Уведомления" value={s.notify} onChange={(v) => set({ notify: v })} />} />
+        <Item title="Уведомления" sub="сообщения, задачи, заказы и утренняя сводка в 8:00" right={<Toggle label="Уведомления" value={s.notify} onChange={(v) => set({ notify: v })} />} />
+        <Item title="Вход по Face ID" sub={bioMsg || 'спрашивать лицо при открытии приложения'} right={<Toggle label="Вход по Face ID" value={s.lock} onChange={toggleLock} />} />
       </List>
 
       <Section>Маржа</Section>

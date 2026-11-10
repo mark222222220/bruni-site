@@ -11,7 +11,6 @@ export const TABLES: TableName[] = ['clients', 'orders', 'stock', 'payments', 'm
 export interface Backend {
   kind: 'local' | 'cloud';
   load(): Promise<Snapshot>;
-  /** Вызывается при изменениях с других устройств. */
   /** Снимок таблицы завода (только облако). */
   loadSheets?(): Promise<Sheets | null>;
   /** Вызывается при изменениях с других устройств; 'sheets' — обновился снимок таблицы. */
@@ -77,6 +76,7 @@ export function cloudBackend(sb: SupabaseClient): Backend {
     const { data, error } = await sb.from('messages').select('*').order('at', { ascending: false }).limit(300);
     if (error) throw error;
     return ((data ?? []) as (Message & { user_id?: string; edited_at?: number | null })[]).map((m) => ({
+      photo: m.photo ?? null,
       id: m.id,
       channel: m.channel,
       author: m.author,
@@ -137,7 +137,7 @@ export function cloudBackend(sb: SupabaseClient): Backend {
     async upsert(table, row) {
       if (table !== 'messages') return;
       const m = row as Message;
-      const { error } = await sb.from('messages').insert({ id: m.id, channel: m.channel, author: m.author, role: m.role, text: m.text, quote: m.quote ?? null, at: m.at });
+      const { error } = await sb.from('messages').insert({ id: m.id, channel: m.channel, author: m.author, role: m.role, text: m.text, quote: m.quote ?? null, at: m.at, ...(m.photo ? { photo: m.photo } : {}) });
       if (error) throw error;
     },
     async patch(table, id, fields) {

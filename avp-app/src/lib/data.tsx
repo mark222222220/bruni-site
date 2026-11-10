@@ -1,14 +1,17 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from './auth';
 import { makeBackend, type Backend } from './backend';
 import { BALANCE } from './demo';
 import { addDays, dm, fmt, money, today, tomorrow, uid } from './format';
-import { getSheets, setSheets, tablesFromSheets, useSheets } from './sheets';
+import { getSheets, setSheets, tablesFromSheets, useSheets, type Sheets } from './sheets';
+import { useTeam, type Mark, type Move } from './team';
 import { notifyTeamAboutMessage } from './notifications';
 import { supabase } from './supabase';
 import { useSettings } from './settings';
 import { STATUSES, type Snapshot, type TableName, type Tables } from './types';
 
-type State = { snap: Snapshot; loading: boolean; error: string | null };
+type State = { snap: Snapshot; loading: boolean; error: string | null; /** нет связи: показаны сохранённые данные от этого времени */ offlineAt: number | null };
 const EMPTY: Snapshot = { clients: [], orders: [], stock: [], payments: [], messages: [] };
 
 type Ctx = State & {
@@ -16,7 +19,7 @@ type Ctx = State & {
   upsert: <K extends TableName>(table: K, row: Tables[K]) => Promise<boolean>;
   patch: <K extends TableName>(table: K, id: string, fields: Partial<Tables[K]>) => Promise<boolean>;
   remove: (table: TableName, id: string) => Promise<boolean>;
-  send: (channel: string, text: string, quote?: string | null) => Promise<boolean>;
+  send: (channel: string, text: string, quote?: string | null, photo?: string | null) => Promise<boolean>;
   editMessage: (id: string, text: string) => Promise<boolean>;
   deleteMessage: (id: string) => Promise<boolean>;
   resetDemo: () => Promise<void>;
@@ -24,10 +27,41 @@ type Ctx = State & {
 };
 const DataCtx = createContext<Ctx | null>(null);
 
+/** Отметки из приложения поверх таблицы: статусы заказов из цеха и приход на склад после ночной загрузки. */
+function overlay(snap: Snapshot, marks: Mark[], moves: Move[]): Snapshot {
+  if (!marks.length && !moves.length) return snap;
+  const sh = getSheets();
+  const since = sh ? Date.parse(sh.generatedAt) || 0 : 0;
+  const byNo = new Map(marks.map((m) => [m.order_no, m]));
+  const recv = new Map<string, number>();
+  for (const m of moves) if (m.at > since) recv.set(m.item_id, (recv.get(m.item_id) ?? 0) + m.qty);
+  return {
+    ...snap,
+    orders: snap.orders.map((o) => {
+      const m = byNo.get(String(o.no));
+      return m ? { ...o, status: m.status, production: STATUSES.find((x) => x.id === m.status)?.name ?? o.production, markedBy: m.author, markedAt: m.at } : o;
+    }),
+    stock: snap.stock.map((x) => {
+      const r = recv.get(x.id);
+      if (!r) return x;
+      const qty = x.qty + r;
+      const days = x.weekly ? qty / (x.weekly / 7) : x.days;
+      return { ...x, qty, days, received: r, status: x.status === 'Мало' && days != null && days >= 7 ? 'Норма' : x.status };
+    }),
+  };
+}
+
+type Cached = { messages: Snapshot['messages']; sheets: Sheets | null; at: number };
+
 export function DataProvider({ children }: { children: ReactNode }) {
   const backend = useRef<Backend>(makeBackend()).current;
   const { s } = useSettings();
-  const [st, setSt] = useState<State>({ snap: EMPTY, loading: true, error: null });
+  const { profile } = useAuth();
+  const team = useTeam();
+  const [st, setSt] = useState<State>({ snap: EMPTY, loading: true, error: null, offlineAt: null });
+  // сохранённая копия на телефоне — у каждого сотрудника своя (права разные)
+  const cacheKey = backend.kind === 'cloud' && profile ? `avp.cache.${profile.id}` : null;
+  const cachedAt = useRef<number | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -36,23 +70,45 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // цифры завода — из снимка таблицы отца; чат остаётся своим
       const sh = getSheets();
       const merged = sh ? { ...snap, ...tablesFromSheets(sh) } : snap;
-      setSt({ snap: { ...merged }, loading: false, error: null });
+      setSt({ snap: { ...merged }, loading: false, error: null, offlineAt: null });
+      if (cacheKey) {
+        cachedAt.current = Date.now();
+        AsyncStorage.setItem(cacheKey, JSON.stringify({ messages: snap.messages, sheets: sh, at: Date.now() } satisfies Cached)).catch(() => {});
+      }
     } catch (e) {
-      setSt((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : 'Нет связи с базой' }));
+      setSt((p) => ({ ...p, loading: false, error: e instanceof Error ? e.message : 'Нет связи с базой', offlineAt: cachedAt.current }));
     }
-  }, [backend]);
+  }, [backend, cacheKey]);
 
   useEffect(() => {
-    reload();
+    let fresh = false;
+    // сначала показываем сохранённое — экран не пустой даже без связи
+    if (cacheKey)
+      AsyncStorage.getItem(cacheKey)
+        .then((raw) => {
+          if (!raw || fresh) return;
+          const c = JSON.parse(raw) as Cached;
+          cachedAt.current = c.at;
+          if (c.sheets && !getSheets()) setSheets(c.sheets);
+          const base = { ...EMPTY, messages: c.messages ?? [] };
+          setSt((p) => (p.loading || p.error ? { ...p, snap: c.sheets ? { ...base, ...tablesFromSheets(c.sheets) } : base, loading: false, offlineAt: p.error ? c.at : p.offlineAt } : p));
+        })
+        .catch(() => {});
+    reload().then(() => {
+      fresh = true;
+    });
     return backend.subscribe((table, rows) => {
       if (table === 'sheets') {
         const sh = getSheets();
         if (sh) setSt((p) => ({ ...p, snap: { ...p.snap, ...tablesFromSheets(sh) } }));
         return;
       }
-      setSt((p) => ({ ...p, snap: { ...p.snap, [table]: rows } }));
+      setSt((p) => ({ ...p, snap: { ...p.snap, [table]: rows }, error: null, offlineAt: null }));
+      if (table === 'messages' && cacheKey) {
+        AsyncStorage.setItem(cacheKey, JSON.stringify({ messages: rows as Snapshot['messages'], sheets: getSheets(), at: Date.now() } satisfies Cached)).catch(() => {});
+      }
     });
-  }, [backend, reload]);
+  }, [backend, reload, cacheKey]);
 
   /** Сначала меняем экран, потом пишем в базу; при ошибке перечитываем данные. */
   const run = useCallback(
@@ -96,11 +152,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [backend, run],
   );
   const send = useCallback(
-    async (channel: string, text: string, quote?: string | null) => {
-      const ok = await upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now() });
+    async (channel: string, text: string, quote?: string | null, photo?: string | null) => {
+      const ok = await upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now(), photo: photo ?? null });
       // коллегам — уведомление на телефон
       if (ok && backend.kind === 'cloud' && supabase) {
-        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim()));
+        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim() || '📷 Фото'));
       }
       return ok;
     },
@@ -109,10 +165,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const editMessage = useCallback((id: string, text: string) => patch('messages', id, { text: text.trim(), editedAt: Date.now() }), [patch]);
   const deleteMessage = useCallback((id: string) => remove('messages', id), [remove]);
   const resetDemo = useCallback(async () => {
-    if (backend.resetDemo) setSt({ snap: await backend.resetDemo(), loading: false, error: null });
+    if (backend.resetDemo) setSt({ snap: await backend.resetDemo(), loading: false, error: null, offlineAt: null });
   }, [backend]);
 
-  const value = useMemo(() => ({ ...st, kind: backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload }), [st, backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload]);
+  const snap = useMemo(() => overlay(st.snap, team.marks, team.moves), [st.snap, team.marks, team.moves]);
+  const value = useMemo(() => ({ ...st, snap, kind: backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload }), [st, snap, backend.kind, upsert, patch, remove, send, editMessage, deleteMessage, resetDemo, reload]);
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }
 

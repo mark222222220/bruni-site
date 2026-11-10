@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSettings } from './settings';
@@ -73,6 +74,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut();
+    // сохранённые на телефоне цифры завода — стираем при выходе
+    const keys = await AsyncStorage.getAllKeys().catch(() => [] as readonly string[]);
+    await AsyncStorage.multiRemove(keys.filter((k) => k.startsWith('avp.cache.'))).catch(() => {});
   }, []);
 
   const value = useMemo(() => ({ required: !!supabase, ready, session, profile, noAccess, signIn, signOut }), [ready, session, profile, noAccess, signIn, signOut]);

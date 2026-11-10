@@ -24,7 +24,7 @@ import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '0.6.1';
+export const APP_BUILD = '0.7.0';
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
 
@@ -441,6 +441,12 @@ const PATHS: Record<string, string[]> = {
   cal: ['M3 10h18M8 3v4M16 3v4'],
   flame: ['M12 3c3 4 6 6 6 10a6 6 0 0 1-12 0c0-3 2-4 3-7 1 2 2 3 3 3 0-2-1-4 0-6z'],
   bolt: ['M13 2L4 14h7l-1 8 9-12h-7z'],
+  tasks: ['M9 11l3 3 8-8', 'M20 12v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h11'],
+  camera: ['M3 8a1 1 0 0 1 1-1h3l2-3h6l2 3h3a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', 'M12 9.5a3.5 3.5 0 1 1 0 7a3.5 3.5 0 1 1 0-7'],
+  image: ['M4 4h16v16H4z', 'M4 16l5-5 4 4 3-3 4 4', 'M15 7.5a1.5 1.5 0 1 1 0 3a1.5 1.5 0 1 1 0-3'],
+  doc: ['M6 3h9l4 4v14H6z', 'M14 3v5h5', 'M9 13h7M9 17h5'],
+  trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13'],
+  lock: ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4'],
 };
 export function Icon({ name, size = 22, color, stroke = 1.9 }: { name: string; size?: number; color?: string; stroke?: number }) {
   const { t } = useSettings();

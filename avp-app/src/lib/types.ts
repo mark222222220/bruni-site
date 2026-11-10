@@ -40,6 +40,9 @@ export type Order = {
   sp?: number;
   production?: string;
   fromSheet?: boolean;
+  /** кто и когда отметил статус в приложении */
+  markedBy?: string;
+  markedAt?: number;
 };
 
 export type StockItem = {
@@ -59,6 +62,8 @@ export type StockItem = {
   supplier?: string;
   group?: string;
   fromSheet?: boolean;
+  /** принято на склад через приложение после ночной загрузки */
+  received?: number;
 };
 
 export type Payment = {
@@ -87,6 +92,8 @@ export type Message = {
   userId?: string;
   /** когда изменено, ms */
   editedAt?: number | null;
+  /** фото в закрытом хранилище (путь) */
+  photo?: string | null;
 };
 
 export type Tables = {
