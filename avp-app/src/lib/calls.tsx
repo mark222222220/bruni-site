@@ -2,7 +2,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, Vibration, View } from 'react-native';
-import { Avatar, Fill, Icon, T, Wallpaper } from '@/components/ui';
+import { APP_BUILD, Avatar, Fill, Icon, T, Wallpaper } from '@/components/ui';
 import { useAuth } from './auth';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
@@ -11,8 +11,8 @@ import { useSettings } from './settings';
 import { useTeam } from './team';
 import { supabase } from './supabase';
 
-export type CallInfo = { id: string; peerId: string; peerName: string; video: boolean; role: 'caller' | 'callee' };
-type Ring = { callId: string; fromId: string; fromName: string; video: boolean };
+export type CallInfo = { id: string; peerId: string; peerName: string; video: boolean; role: 'caller' | 'callee'; /** версия приложения у собеседника, если он её прислал */ peerVersion?: string };
+type Ring = { callId: string; fromId: string; fromName: string; video: boolean; v?: string };
 
 type Ctx = {
   startCall: (peer: { id: string; name: string }, video: boolean) => void;
@@ -124,7 +124,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       if (!profile) return;
       const c: CallInfo = { id: rid(), peerId: peer.id, peerName: peer.name, video, role: 'caller' };
       setCurrent(c);
-      sendOnce(ringTopic(peer.id), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video });
+      sendOnce(ringTopic(peer.id), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video, v: APP_BUILD });
       pushCallRef.current(c, 'ring');
       router.push({ pathname: '/call', params: { id: c.id } });
     },
@@ -171,7 +171,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const ring = useCallback(
     (c: CallInfo) => {
-      if (profile) sendOnce(ringTopic(c.peerId), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video: c.video });
+      if (profile) sendOnce(ringTopic(c.peerId), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video: c.video, v: APP_BUILD });
     },
     [profile],
   );
@@ -181,7 +181,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
   const accept = () => {
     if (!incoming) return;
-    const c: CallInfo = { id: incoming.callId, peerId: incoming.fromId, peerName: incoming.fromName, video: incoming.video, role: 'callee' };
+    const c: CallInfo = { id: incoming.callId, peerId: incoming.fromId, peerName: incoming.fromName, video: incoming.video, role: 'callee', peerVersion: incoming.v ?? 'old' };
     setIncoming(null);
     setCurrent(c);
     router.push({ pathname: '/call', params: { id: c.id } });

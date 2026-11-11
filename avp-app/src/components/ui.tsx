@@ -25,7 +25,7 @@ import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '1.2.3';
+export const APP_BUILD = '1.2.4';
 const SECRETS = ['Гласс-Хаус Крым — сила! 🏆', 'Сделано с любовью к стеклу 🪟', 'Ты нашёл пасхалку! 🥚', 'Стекло прозрачное, цифры тоже 😎'];
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');

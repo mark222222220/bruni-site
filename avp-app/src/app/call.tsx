@@ -62,6 +62,8 @@ export default function CallScreen() {
   );
   // прямое соединение не вышло — голос идёт через базу
   const [relay, setRelay] = useState(false);
+  // у собеседника не та версия приложения — звонок может оборваться
+  const [oldPeer, setOldPeer] = useState(!!call && call.role === 'callee' && call.peerVersion !== APP_BUILD);
   // ход соединения — видно на экране, пока не соединились (и по нажатию на имя)
   const [steps, setSteps] = useState<string[]>([]);
   const [showSteps, setShowSteps] = useState(false);
@@ -127,8 +129,10 @@ export default function CallScreen() {
     const c = supabase
       .channel(callTopic(call.id), { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'signal' }, ({ payload }) => deliver(payload))
-      .on('broadcast', { event: 'joined' }, () => {
-        if (!st.current.peerJoined) step('собеседник ответил');
+      .on('broadcast', { event: 'joined' }, ({ payload }) => {
+        const v = (payload as { v?: string } | undefined)?.v ?? 'old';
+        if (!st.current.peerJoined) step(`собеседник ответил (версия ${v === 'old' ? 'старая' : v})`);
+        if (v !== APP_BUILD) setOldPeer(true);
         st.current.peerJoined = true;
         setStatus('Соединяем…');
         tryStart();
@@ -138,7 +142,7 @@ export default function CallScreen() {
       .on('broadcast', { event: 'bye' }, () => finish('Звонок завершён', 'bye'))
       .subscribe((s) => {
         step(s === 'SUBSCRIBED' ? 'канал связи открыт' : `канал связи: ${s}`);
-        if (s === 'SUBSCRIBED' && call.role === 'callee') c.send({ type: 'broadcast', event: 'joined', payload: {} });
+        if (s === 'SUBSCRIBED' && call.role === 'callee') c.send({ type: 'broadcast', event: 'joined', payload: { v: APP_BUILD } });
       });
     ch.current = c;
     // нет ответа 45 секунд; пока ждём — повторяем вызов (вдруг собеседник только открыл приложение по уведомлению)
@@ -184,7 +188,7 @@ export default function CallScreen() {
       st.current.webReady = true;
       queue.current.splice(0).forEach((d) => js(`window.avp.signal(${JSON.stringify(d)})`));
       route(speaker); // страница заняла микрофон — возвращаем выбранный выход звука
-      if (call?.role === 'callee') ch.current?.send({ type: 'broadcast', event: 'joined', payload: {} });
+      if (call?.role === 'callee') ch.current?.send({ type: 'broadcast', event: 'joined', payload: { v: APP_BUILD } });
       tryStart();
     } else if (m.type === 'signal') ch.current?.send({ type: 'broadcast', event: 'signal', payload: m.data as object });
     else if (m.type === 'audio') ch.current?.send({ type: 'broadcast', event: 'audio', payload: { d: (m as { d?: string }).d ?? '' } });
@@ -247,6 +251,13 @@ export default function CallScreen() {
                 {i + 1}. {x}
               </T>
             ))}
+          </View>
+        ) : null}
+        {oldPeer ? (
+          <View style={{ backgroundColor: 'rgba(255,170,0,0.18)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 8, maxWidth: '86%' }}>
+            <T v="small" style={{ color: '#FFC55C', textAlign: 'center' }}>
+              У собеседника другая версия AVP (у вас {APP_BUILD}). Пусть обновит приложение — иначе звонок может оборваться.
+            </T>
           </View>
         ) : null}
         {relay && !status ? (
