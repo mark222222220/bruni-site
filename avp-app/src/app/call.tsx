@@ -62,6 +62,10 @@ export default function CallScreen() {
   );
   // прямое соединение не вышло — голос идёт через базу
   const [relay, setRelay] = useState(false);
+  // ход соединения — видно на экране, пока не соединились (и по нажатию на имя)
+  const [steps, setSteps] = useState<string[]>([]);
+  const [showSteps, setShowSteps] = useState(false);
+  const step = useCallback((m: string) => setSteps((p) => (p[p.length - 1] === m ? p : [...p, m].slice(-9))), []);
   const done = useRef(false);
   const ticks = useRef(0);
 
@@ -114,6 +118,7 @@ export default function CallScreen() {
       .channel(callTopic(call.id), { config: { broadcast: { self: false } } })
       .on('broadcast', { event: 'signal' }, ({ payload }) => deliver(payload))
       .on('broadcast', { event: 'joined' }, () => {
+        if (!st.current.peerJoined) step('собеседник ответил');
         st.current.peerJoined = true;
         setStatus('Соединяем…');
         tryStart();
@@ -122,10 +127,12 @@ export default function CallScreen() {
       .on('broadcast', { event: 'audio' }, ({ payload }) => js(`window.avp.play(${JSON.stringify((payload as { d?: string }).d ?? '')})`))
       .on('broadcast', { event: 'bye' }, () => finish('Звонок завершён', 'bye'))
       .subscribe((s) => {
+        step(s === 'SUBSCRIBED' ? 'канал связи открыт' : `канал связи: ${s}`);
         if (s === 'SUBSCRIBED' && call.role === 'callee') c.send({ type: 'broadcast', event: 'joined', payload: {} });
       });
     ch.current = c;
     // нет ответа 45 секунд; пока ждём — повторяем вызов (вдруг собеседник только открыл приложение по уведомлению)
+    const noMic = setTimeout(() => !st.current.webReady && !done.current && setStatus('Микрофон не запускается…'), 12000);
     const noAnswer = setTimeout(() => !st.current.peerJoined && finish('Не отвечает'), 45000);
     const again = setInterval(() => {
       if (call.role !== 'caller' || st.current.peerJoined || done.current) return;
@@ -136,6 +143,7 @@ export default function CallScreen() {
     }, 3000);
     return () => {
       clearTimeout(noAnswer);
+      clearTimeout(noMic);
       clearInterval(again);
       supabase?.removeChannel(c);
     };
@@ -161,6 +169,7 @@ export default function CallScreen() {
     } catch {
       return;
     }
+    if (m.type === 'log') return step((m as { m?: string }).m ?? '');
     if (m.type === 'ready') {
       st.current.webReady = true;
       queue.current.splice(0).forEach((d) => js(`window.avp.signal(${JSON.stringify(d)})`));
@@ -213,7 +222,7 @@ export default function CallScreen() {
         containerStyle={{ backgroundColor: '#0A0A0C' }}
         onError={() => finish('Не удалось открыть звонок')}
       />
-      <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: ins.top + 30, alignItems: 'center', gap: 10 }}>
+      <View style={{ position: 'absolute', left: 0, right: 0, top: ins.top + 30, alignItems: 'center', gap: 10 }} onTouchEnd={() => setShowSteps((v) => !v)}>
         {!call.video || !connectedAt || relay ? <Avatar name={call.peerName} size={110} /> : null}
         <T v="title" style={{ textAlign: 'center', color: '#fff' }}>
           {call.peerName}
@@ -221,6 +230,15 @@ export default function CallScreen() {
         <T v="b" style={{ color: 'rgba(255,255,255,0.75)' }}>
           {status || timer}
         </T>
+        {(!connectedAt || showSteps) && steps.length ? (
+          <View style={{ marginTop: 14, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, maxWidth: '86%' }}>
+            {steps.map((x, i) => (
+              <T key={i} v="small" style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                {i + 1}. {x}
+              </T>
+            ))}
+          </View>
+        ) : null}
         {relay && !status ? (
           <T v="small" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', paddingHorizontal: 30 }}>
             {call.video ? 'Напрямую соединиться не удалось — идёт только голос, через сервер' : 'Голос идёт через сервер'}
