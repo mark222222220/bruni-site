@@ -45,8 +45,10 @@ function overlay(snap: Snapshot, marks: Mark[], moves: Move[]): Snapshot {
       const r = recv.get(x.id);
       if (!r) return x;
       const qty = x.qty + r;
-      const days = x.weekly ? qty / (x.weekly / 7) : x.days;
-      return { ...x, qty, days, received: r, status: x.status === 'Мало' && days != null && days >= 7 ? 'Норма' : x.status };
+      const days = x.weekly ? Math.max(0, qty) / (x.weekly / 7) : x.days;
+      // статус пересчитываем по дням запаса: <3 дн. — мало, от 7 дн. — норма
+      const status = x.status === 'Нет расхода' || days == null ? x.status : days < 3 ? 'Мало' : days >= 7 ? 'Норма' : x.status;
+      return { ...x, qty, days, received: r, status };
     }),
   };
 }

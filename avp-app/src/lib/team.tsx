@@ -12,7 +12,9 @@ import { STATUSES, type Role, type Status } from './types';
 
 export type Person = { id: string; name: string; role: Role; push_token?: string };
 export type Task = { id: string; title: string; assignee: string | null; assignee_name: string; due: string | null; done: boolean; done_at: number | null; channel: string | null; author: string; user_id: string; at: number };
-export type Move = { id: string; item_id: string; item_name: string; qty: number; unit: string; note: string | null; photo: string | null; author: string; user_id: string; at: number };
+/** Движение по складу. qty со знаком: приход +, выдача и списание −, инвентаризация — разница с учётом. */
+export type MoveKind = 'in' | 'out' | 'writeoff' | 'count';
+export type Move = { id: string; kind: MoveKind; item_id: string; item_name: string; qty: number; unit: string; note: string | null; photo: string | null; order_no: string | null; author: string; user_id: string; at: number };
 export type Mark = { order_no: string; status: Status; author: string; user_id: string; at: number };
 export type Read = { user_id: string; channel: string; at: number };
 export type Note = { id: string; client: string; text: string; author: string; user_id: string; at: number };
@@ -33,6 +35,7 @@ type Ctx = Data & {
   toggleTask: (t: Task) => Promise<boolean>;
   removeTask: (id: string) => Promise<boolean>;
   addMove: (m: Omit<Move, 'id' | 'author' | 'user_id' | 'at'>) => Promise<string | null>;
+  removeMove: (id: string) => Promise<string | null>;
   markOrder: (no: string, status: Status, label: string) => Promise<string | null>;
   markRead: (channel: string, at: number) => void;
   addNote: (client: string, text: string) => Promise<boolean>;
@@ -70,7 +73,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     const [people, ...rest] = await Promise.all([
       sb.from('profiles').select('*').order('name'),
       sb.from('tasks').select('*').order('at', { ascending: false }).limit(300),
-      sb.from('stock_moves').select('*').order('at', { ascending: false }).limit(300),
+      sb.from('stock_moves').select('*').order('at', { ascending: false }).limit(1500),
       sb.from('order_marks').select('*'),
       sb.from('chat_reads').select('*'),
       sb.from('client_notes').select('*').order('at', { ascending: false }).limit(500),
@@ -82,7 +85,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     setD({
       people: pick<Person>(people),
       tasks: pick<Task>(rest[0]).map((x) => ({ ...num(x), done_at: x.done_at ? Number(x.done_at) : null })),
-      moves: pick<Move>(rest[1]).map((x) => ({ ...num(x), qty: Number(x.qty) })),
+      moves: pick<Move>(rest[1]).map((x) => ({ ...num(x), qty: Number(x.qty), kind: x.kind ?? 'in', order_no: x.order_no ?? null })),
       marks: pick<Mark>(rest[2]).map(num),
       reads: pick<Read>(rest[3]).map(num),
       notes: pick<Note>(rest[4]).map(num),
@@ -214,6 +217,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     },
     [apply, me, myName],
   );
+  const removeMove = useCallback((id: string) => apply((p) => ({ ...p, moves: p.moves.filter((x) => x.id !== id) }), () => supabase!.from('stock_moves').delete().eq('id', id)), [apply]);
 
   const markOrder = useCallback(
     async (no: string, status: Status, label: string) => {
@@ -264,8 +268,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ ...d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping }),
-    [d, me, missing, addTask, toggleTask, removeTask, addMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping],
+    () => ({ ...d, me, missing, addTask, toggleTask, removeTask, addMove, removeMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping }),
+    [d, me, missing, addTask, toggleTask, removeTask, addMove, removeMove, markOrder, markRead, addNote, removeNote, notify, toggleReaction, online, typing, setTyping],
   );
   return <TeamCtx.Provider value={value}>{children}</TeamCtx.Provider>;
 }

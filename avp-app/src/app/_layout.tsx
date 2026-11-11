@@ -49,6 +49,11 @@ function Root() {
         <Stack.Screen name="tasks" />
         <Stack.Screen name="new-task" options={{ ...sheet, sheetAllowedDetents: [0.75, 1] }} />
         <Stack.Screen name="receipt" options={{ ...sheet, sheetAllowedDetents: [1] }} />
+        <Stack.Screen name="stock-move" options={{ ...sheet, sheetAllowedDetents: [1] }} />
+        <Stack.Screen name="stock-item" options={{ ...sheet, sheetAllowedDetents: [0.75, 1] }} />
+        <Stack.Screen name="inventory" />
+        <Stack.Screen name="stock-log" />
+        <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
       </Stack>
       <Shake />
       <Confetti />

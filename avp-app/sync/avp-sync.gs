@@ -7,7 +7,8 @@
  *   Готово: каждую ночь около 00:00 по Москве цифры уходят в приложение,
  *   а в меню таблицы появится «AVP → Обновить приложение сейчас».
  *
- * Скрипт читает 7 листов и отправляет сводку в закрытую базу приложения.
+ * Скрипт читает 7 листов и отправляет сводку в закрытую базу приложения,
+ * а обратно забирает журнал склада из приложения на лист «Склад — движения (AVP)».
  * Ключ ниже умеет только одно — обновлять цифры завода; прочитать базу им нельзя.
  */
 
@@ -76,9 +77,52 @@ function syncAvp() {
   });
   var code = res.getResponseCode();
   if (code < 200 || code >= 300) throw new Error('База ответила ' + code + ': ' + res.getContentText().slice(0, 300));
+  var journal = '';
+  try {
+    journal = writeMoves_(ss);
+  } catch (e) {
+    journal = ' · журнал склада: ' + (e.message || e);
+  }
   var msg = 'склад ' + s.stock.length + ', клиенты ' + s.clients.list.length + ', платежи ' + s.payments.list.length + ', отгрузки ' + s.shipments.planned.length + ' + просрочено ' + s.shipments.overdue.length + ', на счёте ' + (s.bank ? s.bank.balance : '—');
+  msg += journal;
   Logger.log(msg);
   return msg;
+}
+
+/** Лист «Склад — движения (AVP)»: приход, выдача, списание, пересчёт из приложения за 60 дней. */
+function writeMoves_(ss) {
+  var res = UrlFetchApp.fetch(AVP.url + '/rest/v1/rpc/avp_sync_moves', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { apikey: AVP.publicKey },
+    payload: JSON.stringify({ p_token: AVP.syncToken, p_days: 60 }),
+    muteHttpExceptions: true,
+  });
+  if (res.getResponseCode() >= 300) throw new Error('база ответила ' + res.getResponseCode());
+  var list = JSON.parse(res.getContentText()) || [];
+  var KIND = { in: 'Приход', out: 'Выдача в цех', writeoff: 'Списание', count: 'Инвентаризация' };
+  var name = 'Склад — движения (AVP)';
+  var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clearContents();
+  var head = ['Дата', 'Время', 'Операция', 'Материал', 'Количество', 'Ед.', 'Заказ', 'Комментарий', 'Кто'];
+  var rows = list.map(function (m) {
+    var d = new Date(Number(m.at));
+    return [
+      Utilities.formatDate(d, 'Europe/Moscow', 'dd.MM.yyyy'),
+      Utilities.formatDate(d, 'Europe/Moscow', 'HH:mm'),
+      KIND[m.kind] || m.kind,
+      m.item,
+      Number(m.qty),
+      m.unit || '',
+      m.order_no || '',
+      m.note || '',
+      m.author || '',
+    ];
+  });
+  sh.getRange(1, 1, 1, head.length).setValues([head]).setFontWeight('bold');
+  if (rows.length) sh.getRange(2, 1, rows.length, head.length).setValues(rows);
+  sh.setFrozenRows(1);
+  return ' · журнал склада: ' + rows.length + ' записей';
 }
 
 function book_() {

@@ -3,7 +3,7 @@
     "name": "AVP system",
     "slug": "avp-system",
     "scheme": "avp",
-    "version": "0.9.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -60,6 +60,12 @@
         "expo-audio",
         {
           "microphonePermission": "AVP записывает голосовые сообщения для чата команды."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AVP сканирует QR-наклейки на полках склада и снимает накладные."
         }
       ]
     ],

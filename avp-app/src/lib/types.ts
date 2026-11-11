@@ -62,7 +62,7 @@ export type StockItem = {
   supplier?: string;
   group?: string;
   fromSheet?: boolean;
-  /** принято на склад через приложение после ночной загрузки */
+  /** движение через приложение после ночной загрузки (приход +, выдача/списание −) */
   received?: number;
 };
 

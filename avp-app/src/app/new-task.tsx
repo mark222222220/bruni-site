@@ -71,7 +71,7 @@ export default function NewTask() {
       <Glass style={{ padding: 16, gap: 14 }}>
         <Field label="Что сделать" value={title} onChangeText={setTitle} placeholder="Заказать бутил у поставщика" multiline maxLength={500} autoFocus={!p.text} style={{ minHeight: 70 }} />
         <T v="small">Кому</T>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: "flex-start" }}>
           <Chip on={!to || to.id === me} label="Себе" onPress={() => setTo(null)} />
           {others.map((x) => (
             <Chip key={x.id} on={to?.id === x.id} label={firstName(x.name)} sub={ROLES[x.role]?.name} onPress={() => setTo(x)} />
