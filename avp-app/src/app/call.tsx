@@ -60,6 +60,8 @@ export default function CallScreen() {
     },
     [],
   );
+  // прямое соединение не вышло — голос идёт через базу
+  const [relay, setRelay] = useState(false);
   const done = useRef(false);
   const ticks = useRef(0);
 
@@ -116,6 +118,8 @@ export default function CallScreen() {
         setStatus('Соединяем…');
         tryStart();
       })
+      .on('broadcast', { event: 'relay' }, () => js('window.avp.relay()'))
+      .on('broadcast', { event: 'audio' }, ({ payload }) => js(`window.avp.play(${JSON.stringify((payload as { d?: string }).d ?? '')})`))
       .on('broadcast', { event: 'bye' }, () => finish('Звонок завершён', 'bye'))
       .subscribe((s) => {
         if (s === 'SUBSCRIBED' && call.role === 'callee') c.send({ type: 'broadcast', event: 'joined', payload: {} });
@@ -164,11 +168,21 @@ export default function CallScreen() {
       if (call?.role === 'callee') ch.current?.send({ type: 'broadcast', event: 'joined', payload: {} });
       tryStart();
     } else if (m.type === 'signal') ch.current?.send({ type: 'broadcast', event: 'signal', payload: m.data as object });
+    else if (m.type === 'audio') ch.current?.send({ type: 'broadcast', event: 'audio', payload: { d: (m as { d?: string }).d ?? '' } });
+    else if (m.type === 'relay') ch.current?.send({ type: 'broadcast', event: 'relay', payload: {} });
     else if (m.type === 'state') {
       if (m.state === 'connected') {
         setStatus('');
         setConnectedAt((v) => v ?? Date.now());
+        setRelay(false);
         route(speaker);
+      } else if (m.state === 'relay') {
+        setStatus('');
+        setRelay(true);
+        setConnectedAt((v) => v ?? Date.now());
+        route(speaker);
+      } else if (m.state === 'lost') {
+        finish('Связь прервалась');
       } else if (m.state === 'failed') finish('Связь прервалась');
       else if (m.state === 'disconnected') setStatus('Плохая связь…');
     } else if (m.type === 'error') finish(m.message);
@@ -200,13 +214,18 @@ export default function CallScreen() {
         onError={() => finish('Не удалось открыть звонок')}
       />
       <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: ins.top + 30, alignItems: 'center', gap: 10 }}>
-        {!call.video || !connectedAt ? <Avatar name={call.peerName} size={110} /> : null}
+        {!call.video || !connectedAt || relay ? <Avatar name={call.peerName} size={110} /> : null}
         <T v="title" style={{ textAlign: 'center', color: '#fff' }}>
           {call.peerName}
         </T>
         <T v="b" style={{ color: 'rgba(255,255,255,0.75)' }}>
           {status || timer}
         </T>
+        {relay && !status ? (
+          <T v="small" style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', paddingHorizontal: 30 }}>
+            {call.video ? 'Напрямую соединиться не удалось — идёт только голос, через сервер' : 'Голос идёт через сервер'}
+          </T>
+        ) : null}
       </View>
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: ins.bottom + 30, flexDirection: 'row', justifyContent: 'space-around', flexWrap: 'wrap', rowGap: 18 }}>
         <RoundButton
