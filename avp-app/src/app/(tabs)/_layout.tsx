@@ -1,14 +1,14 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 import { useData } from '@/lib/data';
 import { useSettings } from '@/lib/settings';
-import { ROLE_SECTIONS, type Section } from '@/lib/types';
+import { CHANNELS, ROLE_SECTIONS, type Section } from '@/lib/types';
 
 /** Нижние вкладки — системные: на iOS 26 это настоящая стеклянная панель Liquid Glass. */
 export default function TabsLayout() {
   const { s, t } = useSettings();
   const { snap } = useData();
   const tabs = new Set<Section>(ROLE_SECTIONS[s.role].slice(0, 4));
-  const unread = s.badges ? snap.messages.filter((m) => m.at > (s.seen[m.channel] ?? 0) && m.author !== s.name).length : 0;
+  const unread = s.badges ? snap.messages.filter((m) => CHANNELS.some((c) => c.id === m.channel) && m.at > (s.seen[m.channel] ?? 0) && m.author !== s.name).length : 0;
   return (
     <NativeTabs tintColor={t.accent} minimizeBehavior="onScrollDown">
       <NativeTabs.Trigger name="index" hidden={!tabs.has('index')}>

@@ -3,10 +3,10 @@ import { setAudioModeAsync } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type Ref } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
-import { Avatar, T } from '@/components/ui';
+import { APP_BUILD, Avatar, T } from '@/components/ui';
 import { callPage } from '@/lib/callPage';
 import { callTopic, RoundButton, useCalls } from '@/lib/calls';
 import { useSettings } from '@/lib/settings';
@@ -32,7 +32,7 @@ const Web = WebView as unknown as ComponentType<{
 /** Экран разговора. Голос и видео идут напрямую между телефонами (WebRTC), договариваются через Supabase Realtime. */
 export default function CallScreen() {
   useKeepAwake();
-  const { t } = useSettings();
+  const { t, s } = useSettings();
   const ins = useSafeAreaInsets();
   const { current: call, setCurrent, notify, lastResult, ring, pushCall } = useCalls();
   const web = useRef<WebHandle>(null);
@@ -65,7 +65,12 @@ export default function CallScreen() {
   // ход соединения — видно на экране, пока не соединились (и по нажатию на имя)
   const [steps, setSteps] = useState<string[]>([]);
   const [showSteps, setShowSteps] = useState(false);
-  const step = useCallback((m: string) => setSteps((p) => (p[p.length - 1] === m ? p : [...p, m].slice(-9))), []);
+  const all = useRef<string[]>([]);
+  const t0 = useRef(Date.now());
+  const step = useCallback((m: string) => {
+    all.current.push(`${((Date.now() - t0.current) / 1000).toFixed(1)} ${m}`);
+    setSteps((p) => (p[p.length - 1] === m ? p : [...p, m].slice(-9)));
+  }, []);
   const done = useRef(false);
   const ticks = useRef(0);
 
@@ -85,6 +90,11 @@ export default function CallScreen() {
     (reason?: string, tone?: 'busy' | 'bye') => {
       if (done.current) return;
       done.current = true;
+      // отчёт о звонке — в служебный канал базы (в чатах не виден), чтобы можно было разобраться, если не соединило
+      if (supabase && call) {
+        const text = `${APP_BUILD} ${Platform.OS} ${Platform.Version} · ${call.role} · ${call.video ? 'video' : 'audio'} · итог: ${reason ?? 'завершил сам'}${connectedAt ? ` · говорили ${Math.round((Date.now() - connectedAt) / 1000)} c` : ''}\n${all.current.join('\n')}`.slice(0, 1000);
+        supabase.from('messages').insert({ id: `dbg${call.id}${call.role}`, channel: 'debug', author: s.name || '?', role: s.role, text, at: Date.now() }).then(() => {});
+      }
       if (tone) js(`window.avp.${tone}()`);
       else js('window.avp.ringback(false)');
       if (ch.current) {
@@ -191,8 +201,8 @@ export default function CallScreen() {
         setConnectedAt((v) => v ?? Date.now());
         route(speaker);
       } else if (m.state === 'lost') {
-        finish('Связь прервалась');
-      } else if (m.state === 'failed') finish('Связь прервалась');
+        finish('Собеседник пропал со связи');
+      } else if (m.state === 'failed') finish('Связь прервалась (прямой канал)');
       else if (m.state === 'disconnected') setStatus('Плохая связь…');
     } else if (m.type === 'error') finish(m.message);
   };
@@ -220,7 +230,7 @@ export default function CallScreen() {
         javaScriptEnabled
         style={{ flex: 1, backgroundColor: '#0A0A0C' }}
         containerStyle={{ backgroundColor: '#0A0A0C' }}
-        onError={() => finish('Не удалось открыть звонок')}
+        onError={() => finish('Не открылась страница звонка')}
       />
       <View style={{ position: 'absolute', left: 0, right: 0, top: ins.top + 30, alignItems: 'center', gap: 10 }} onTouchEnd={() => setShowSteps((v) => !v)}>
         {!call.video || !connectedAt || relay ? <Avatar name={call.peerName} size={110} /> : null}
