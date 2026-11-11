@@ -33,7 +33,8 @@ function overlay(snap: Snapshot, marks: Mark[], moves: Move[]): Snapshot {
   const since = sh ? Date.parse(sh.generatedAt) || 0 : 0;
   const byNo = new Map(marks.map((m) => [m.order_no, m]));
   const recv = new Map<string, number>();
-  for (const m of moves) if (m.at > since) recv.set(m.item_id, (recv.get(m.item_id) ?? 0) + m.qty);
+  // по названию: оно не меняется, когда таблицу пересобирают
+  for (const m of moves) if (m.at > since) recv.set(m.item_name, (recv.get(m.item_name) ?? 0) + m.qty);
   return {
     ...snap,
     orders: snap.orders.map((o) => {
@@ -41,7 +42,7 @@ function overlay(snap: Snapshot, marks: Mark[], moves: Move[]): Snapshot {
       return m ? { ...o, status: m.status, production: STATUSES.find((x) => x.id === m.status)?.name ?? o.production, markedBy: m.author, markedAt: m.at } : o;
     }),
     stock: snap.stock.map((x) => {
-      const r = recv.get(x.id);
+      const r = recv.get(x.name);
       if (!r) return x;
       const qty = x.qty + r;
       const days = x.weekly ? Math.max(0, qty) / (x.weekly / 7) : x.days;

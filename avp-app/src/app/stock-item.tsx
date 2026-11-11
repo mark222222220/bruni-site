@@ -13,7 +13,8 @@ export default function StockItem() {
   const { snap } = useData();
   const { moves } = useTeam();
   const { s, t } = useSettings();
-  const x = snap.stock.find((i) => (id ? i.id === id : i.name === name));
+  // сначала по номеру, потом по названию (старые записи журнала помнят прежний номер)
+  const x = snap.stock.find((i) => i.id === id) ?? snap.stock.find((i) => !!name && i.name === name);
   if (!x)
     return (
       <Sheet>

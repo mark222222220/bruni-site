@@ -35,8 +35,8 @@ const day = (s) => {
   if (!m[3] && d.getTime() - now.getTime() > 200 * 864e5) y -= 1;
   return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
 };
-const slug = (s, i) =>
-  'x' + i + '-' + String(s).toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').slice(0, 40);
+// номер материала — только из названия: строки в таблице каждый день меняются местами, а номер должен оставаться тем же
+const slug = (s) => 'x-' + String(s).toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').slice(0, 60);
 
 /* ---------- «Главный» ---------- */
 const M = raw('main');
@@ -154,6 +154,11 @@ for (const r of O) {
     mode = 'overdue';
     continue;
   }
+  // другая таблица на том же листе («срок сегодня-завтра») — к просрочке не относится
+  if (a === 'Срок') {
+    mode = null;
+    continue;
+  }
   if (!a) continue;
   if (mode === 'plan' && day(a)) planned.push({ date: day(a), client: r[1] ?? '', note: String(r[2] ?? '').replace(/\s+/g, ' ').trim(), order: r[3] ?? '', sp: num(r[4]) ?? 0, m2: num(r[5]) ?? 0, sum: num(r[6]) ?? 0, status: r[7] ?? '', production: r[8] ?? '', deadline: day(r[9]) });
   if (mode === 'overdue' && day(a)) overdue.push({ deadline: day(a), days: num(r[1]) ?? 0, client: r[2] ?? '', note: String(r[3] ?? '').trim(), order: r[4] ?? '', m2: num(r[5]) ?? 0, sum: num(r[6]) ?? 0, production: r[7] ?? '', comment: r[8] ?? '' });
@@ -162,7 +167,8 @@ const shipHead = cell(O, 3, 0);
 
 /* ---------- «Банк — остатки» ---------- */
 const B = raw('bank').slice(1).filter((r) => r[0] && num(r[4]) != null);
-const lastBank = B[B.length - 1];
+// выписки в листе идут не по порядку — берём самую свежую по дате «По»
+const lastBank = B.slice().sort((a, b) => String(a[2]).localeCompare(String(b[2]))).pop();
 const bank = lastBank ? { account: lastBank[0], date: lastBank[2], balance: num(lastBank[4]), inflow: num(lastBank[5]), outflow: num(lastBank[6]), read: lastBank[9] ?? '' } : null;
 
 const snapshot = {

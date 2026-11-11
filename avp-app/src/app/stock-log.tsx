@@ -57,7 +57,7 @@ export default function StockLog() {
                 .map((m, i) => (
                   <Pressable
                     key={m.id}
-                    onPress={() => router.push({ pathname: '/stock-item', params: { id: m.item_id } })}
+                    onPress={() => router.push({ pathname: '/stock-item', params: { id: m.item_id, name: m.item_name } })}
                     onLongPress={() => (m.user_id === me || s.role === 'boss' ? setSure(m.id) : undefined)}
                     style={[styles.row, { gap: 10, paddingVertical: 10, borderTopWidth: i ? 0.5 : 0, borderTopColor: t.line }]}
                   >

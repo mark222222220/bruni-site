@@ -56,7 +56,7 @@ export default function StockMove() {
   }, [snap.stock, q]);
   // заказы в работе — для выдачи в цех
   const orders = useMemo(() => snap.orders.filter((o) => o.status !== 'shipped').sort((a, b) => (a.ship || '9').localeCompare(b.ship || '9')).slice(0, 12), [snap.orders]);
-  const history = x ? moves.filter((m) => m.item_id === x.id).slice(0, 5) : [];
+  const history = x ? moves.filter((m) => m.item_name === x.name).slice(0, 5) : [];
 
   const save = async () => {
     if (!x) return;

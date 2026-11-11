@@ -165,7 +165,8 @@ function buildSnapshot(R, now) {
     return y + '-' + pad(m[2]) + '-' + pad(m[1]);
   }
   function slug(s, i) {
-    return 'x' + i + '-' + String(s).toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').slice(0, 40);
+    // номер материала — только из названия: строки в таблице меняются местами, а номер должен оставаться тем же
+    return 'x-' + String(s).toLowerCase().replace(/[^a-zа-яё0-9]+/gi, '-').slice(0, 60);
   }
   function or0(v) {
     return v === null ? 0 : v;
@@ -312,6 +313,11 @@ function buildSnapshot(R, now) {
       mode = 'overdue';
       return;
     }
+    // другая таблица на том же листе («срок сегодня-завтра») — к просрочке не относится
+    if (a === 'Срок') {
+      mode = null;
+      return;
+    }
     if (!a) return;
     if (mode === 'plan' && day(a))
       planned.push({ date: day(a), client: at(r, 1), note: String(at(r, 2)).replace(/\s+/g, ' ').trim(), order: at(r, 3), sp: or0(num(r[4])), m2: or0(num(r[5])), sum: or0(num(r[6])), status: at(r, 7), production: at(r, 8), deadline: day(r[9]) });
@@ -326,7 +332,10 @@ function buildSnapshot(R, now) {
     .filter(function (r) {
       return r[0] && num(r[4]) !== null;
     });
-  var lb = B[B.length - 1];
+  // выписки в листе идут не по порядку — берём самую свежую по дате «По»
+  var lb = B.slice().sort(function (a, b) {
+    return String(a[2]).localeCompare(String(b[2]));
+  }).pop();
   var bank = lb ? { account: lb[0], date: lb[2], balance: num(lb[4]), inflow: num(lb[5]), outflow: num(lb[6]), read: at(lb, 9) } : null;
 
   return {
