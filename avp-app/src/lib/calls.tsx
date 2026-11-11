@@ -4,7 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Modal, Pressable, Vibration, View } from 'react-native';
 import { Avatar, Fill, Icon, T, Wallpaper } from '@/components/ui';
 import { useAuth } from './auth';
-import { sendPush } from './notifications';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import { useSettings } from './settings';
 import { useTeam } from './team';
 import { supabase } from './supabase';
@@ -21,6 +23,8 @@ type Ctx = {
   lastResult: { callId: string; event: string } | null;
   /** повторить вызов собеседнику */
   ring: (c: CallInfo) => void;
+  /** уведомление на экран телефона собеседника: «звонит» или «пропущенный» */
+  pushCall: (c: CallInfo, kind: 'ring' | 'missed') => void;
 };
 const CallCtx = createContext<Ctx | null>(null);
 
@@ -90,11 +94,26 @@ export function CallProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!incoming) return;
     Vibration.vibrate([0, 700, 900], true);
+    // мелодия звонка (в беззвучном режиме — только вибрация)
+    let player: ReturnType<typeof createAudioPlayer> | null = null;
+    setAudioModeAsync({ allowsRecording: false, playsInSilentMode: false, shouldRouteThroughEarpiece: false })
+      .catch(() => {})
+      .then(() => {
+        try {
+          player = createAudioPlayer(require('../../assets/ring.wav'));
+          player.loop = true;
+          player.play();
+        } catch {}
+      });
     const auto = setTimeout(() => {
       declined.current.add(incoming.callId);
       setIncoming(null);
     }, 45000);
     return () => {
+      try {
+        player?.pause();
+        player?.remove();
+      } catch {}
       Vibration.cancel();
       clearTimeout(auto);
     };
@@ -106,13 +125,50 @@ export function CallProvider({ children }: { children: ReactNode }) {
       const c: CallInfo = { id: rid(), peerId: peer.id, peerName: peer.name, video, role: 'caller' };
       setCurrent(c);
       sendOnce(ringTopic(peer.id), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video });
-      // если приложение у собеседника закрыто — уведомление на экран телефона
-      const token = people.find((p) => p.id === peer.id)?.push_token;
-      if (token) sendPush([token], video ? '📹 Видеозвонок AVP' : '📞 Звонок AVP', `${profile.name} звонит вам — откройте приложение`, { kind: 'call' }).catch(() => {});
+      pushCallRef.current(c, 'ring');
       router.push({ pathname: '/call', params: { id: c.id } });
     },
     [profile, people],
   );
+  const pushCall = useCallback(
+    (c: CallInfo, kind: 'ring' | 'missed') => {
+      const token = people.find((p) => p.id === c.peerId)?.push_token;
+      if (!profile || !token || !token.startsWith('ExponentPushToken')) return;
+      const ringing = kind === 'ring';
+      fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: token,
+          title: ringing ? (c.video ? '📹 Входящий видеозвонок' : '📞 Входящий звонок') : '📵 Пропущенный звонок',
+          body: ringing ? `${profile.name} звонит вам в AVP — нажмите, чтобы ответить` : `${profile.name} звонил(а) вам в AVP`,
+          sound: 'default',
+          priority: 'high',
+          interruptionLevel: ringing ? 'time-sensitive' : 'active',
+          ttl: ringing ? 40 : 86400,
+          data: ringing ? { kind: 'call', callId: c.id, fromId: profile.id, fromName: profile.name, video: c.video, at: Date.now() } : { kind: 'missed' },
+        }),
+      }).catch(() => {});
+    },
+    [people, profile],
+  );
+  const pushCallRef = useRef(pushCall);
+  pushCallRef.current = pushCall;
+
+  // открыли приложение по уведомлению «звонит» — сразу показываем входящий
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const open = (n?: Notifications.Notification | null) => {
+      const d = n?.request.content.data as { kind?: string; callId?: string; fromId?: string; fromName?: string; video?: boolean; at?: number } | undefined;
+      if (d?.kind !== 'call' || !d.callId || !d.fromId || Date.now() - (d.at ?? 0) > 45000) return;
+      if (currentRef.current || incomingRef.current || declined.current.has(d.callId)) return;
+      setIncoming({ callId: d.callId, fromId: d.fromId, fromName: d.fromName ?? 'Коллега', video: !!d.video });
+    };
+    Notifications.getLastNotificationResponseAsync().then((r) => open(r?.notification)).catch(() => {});
+    const a = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification));
+    return () => a.remove();
+  }, []);
+
   const ring = useCallback(
     (c: CallInfo) => {
       if (profile) sendOnce(ringTopic(c.peerId), 'ring', { callId: c.id, fromId: profile.id, fromName: profile.name, video: c.video });
@@ -137,7 +193,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setIncoming(null);
   };
 
-  const value = useMemo(() => ({ startCall, notify, current, setCurrent, lastResult, ring }), [startCall, notify, current, lastResult, ring]);
+  const value = useMemo(() => ({ startCall, notify, current, setCurrent, lastResult, ring, pushCall }), [startCall, notify, current, lastResult, ring, pushCall]);
   return (
     <CallCtx.Provider value={value}>
       {children}
