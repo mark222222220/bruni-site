@@ -156,7 +156,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const ok = await upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now(), photo: photo ?? null });
       // коллегам — уведомление на телефон
       if (ok && backend.kind === 'cloud' && supabase) {
-        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim() || '📷 Фото'));
+        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim() || (photo && /^voice\/|\.(m4a|caf|webm|aac)$/i.test(photo) ? '🎤 Голосовое сообщение' : '📷 Фото')));
       }
       return ok;
     },

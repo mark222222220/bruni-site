@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Fill, Glass, Icon, Screen, T, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { clock, isVoice, uploadVoice, useVoiceRecorder, VoiceBubble } from '@/components/Voice';
 import { pickPhoto, uploadPhoto, usePhotoUrl } from '@/lib/photos';
 import { useSettings } from '@/lib/settings';
 import { EMOJI, firstName, useTeam } from '@/lib/team';
@@ -125,6 +126,31 @@ export default function Chat() {
     tap();
     setText((v) => v.replace(/@([A-Za-zА-Яа-яЁё0-9_-]*)$/, '@' + firstName(name) + ' '));
   };
+  // голосовые
+  const voice = useVoiceRecorder();
+  const sendVoice = async () => {
+    const r = await voice.stop();
+    if (!r) return;
+    setErr('');
+    setBusy(true);
+    try {
+      const path = await uploadVoice(r.uri, r.ms);
+      const q = quote;
+      setQuote(null);
+      if (await send(ch, '', q, path)) tap('success');
+      else setErr('Не отправилось — проверьте связь');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Голосовое не загрузилось');
+    }
+    setBusy(false);
+  };
+  useEffect(() => {
+    if (voice.tooLong) sendVoice();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.tooLong]);
+  useEffect(() => {
+    if (voice.error) setErr(voice.error);
+  }, [voice.error]);
   const typers = team.typing.filter((x) => x.ch === ch);
   const onType = (v: string) => {
     setText(v);
@@ -231,7 +257,7 @@ export default function Chat() {
           <View style={{ borderRadius: 20, borderTopRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 3, overflow: 'hidden', zIndex: 0 }}>
             <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
             {m.quote ? <T v="small" style={{ color: t.onAccent, opacity: 0.75, borderLeftWidth: 3, borderLeftColor: t.onAccent, paddingLeft: 8 }}>{m.quote}</T> : null}
-            {m.photo ? <Photo path={m.photo} onOpen={setViewer} /> : null}
+            {m.photo ? isVoice(m.photo) ? <VoiceBubble path={m.photo} light seed={m.id} /> : <Photo path={m.photo} onOpen={setViewer} /> : null}
             {m.text ? <Rich text={m.text} color={t.onAccent} accent={t.onAccent} /> : null}
             <T v="small" style={{ color: t.onAccent, opacity: 0.7, fontSize: 11, alignSelf: 'flex-end' }}>
               {fmtTime(m)}
@@ -258,7 +284,7 @@ export default function Chat() {
                 {`  ${ROLES[m.role]?.name ?? ''} · ${fmtTime(m)}`}
               </T>
               {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
-              {m.photo ? <Photo path={m.photo} onOpen={setViewer} /> : null}
+              {m.photo ? isVoice(m.photo) ? <VoiceBubble path={m.photo} seed={m.id} /> : <Photo path={m.photo} onOpen={setViewer} /> : null}
               {m.text ? <Rich text={m.text} color={t.fg} accent={t.accent2} /> : null}
             </Glass>
           </View>
@@ -398,27 +424,75 @@ export default function Chat() {
               {err}
             </T>
           ) : null}
-          <Glass radius={26} style={[styles.row, { padding: 6, gap: 8 }]}>
-            {editing ? null : (
-              <Pressable onPress={() => attach('camera')} onLongPress={() => attach('library')} accessibilityRole="button" accessibilityLabel="Фото: нажмите — камера, удерживайте — галерея" style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: t.field }}>
-                <Icon name="camera" size={21} color={t.dim} />
+          {voice.recording ? (
+            <Glass radius={26} style={[styles.row, { padding: 6, paddingLeft: 16, gap: 10 }]}>
+              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.bad, opacity: Math.floor(voice.elapsed / 500) % 2 ? 0.35 : 1 }} />
+              <T v="num" style={{ fontSize: 17 }}>
+                {clock(voice.elapsed)}
+              </T>
+              <T v="small" style={{ flex: 1 }} numberOfLines={1}>
+                Запись… до 5 минут
+              </T>
+              <Pressable
+                onPress={() => {
+                  tap('warning');
+                  voice.cancel();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Отменить запись"
+                style={{ paddingHorizontal: 12, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: t.field }}
+              >
+                <T v="b" style={{ color: t.bad, fontSize: 14 }}>
+                  Отмена
+                </T>
               </Pressable>
-            )}
-            <TextInput
-              ref={input}
-              value={text}
-              onChangeText={onType}
-              placeholder="Сообщение · @имя"
-              placeholderTextColor={t.mute}
-              multiline
-              maxLength={1000}
-              style={{ flex: 1, minHeight: 42, maxHeight: 120, borderRadius: 21, backgroundColor: t.field, color: t.fg, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 16, fontFamily: 'Rubik_400Regular' }}
-              accessibilityLabel="Сообщение"
-            />
-            <Pressable onPress={submit} disabled={busy} accessibilityRole="button" accessibilityLabel={editing ? 'Сохранить' : 'Отправить'} style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', opacity: text.trim() || photo ? 1 : 0.5 }}>
-              <Icon name={editing ? 'check' : 'send'} size={20} color={t.onAccent} stroke={editing ? 2.6 : 1.9} />
-            </Pressable>
-          </Glass>
+              <Pressable onPress={sendVoice} accessibilityRole="button" accessibilityLabel="Отправить голосовое" style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name="send" size={20} color={t.onAccent} />
+              </Pressable>
+            </Glass>
+          ) : busy && !photo ? (
+            <Glass radius={26} style={[styles.row, { padding: 14, gap: 10 }]}>
+              <ActivityIndicator color={t.accent} />
+              <T v="small">Отправляю голосовое…</T>
+            </Glass>
+          ) : (
+          <Glass radius={26} style={[styles.row, { padding: 6, gap: 8 }]}>
+              {editing ? null : (
+                <Pressable onPress={() => attach('camera')} onLongPress={() => attach('library')} accessibilityRole="button" accessibilityLabel="Фото: нажмите — камера, удерживайте — галерея" style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: t.field }}>
+                  <Icon name="camera" size={21} color={t.dim} />
+                </Pressable>
+              )}
+              <TextInput
+                ref={input}
+                value={text}
+                onChangeText={onType}
+                placeholder="Сообщение · @имя"
+                placeholderTextColor={t.mute}
+                multiline
+                maxLength={1000}
+                style={{ flex: 1, minHeight: 42, maxHeight: 120, borderRadius: 21, backgroundColor: t.field, color: t.fg, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11, fontSize: 16, fontFamily: 'Rubik_400Regular' }}
+                accessibilityLabel="Сообщение"
+              />
+              {!editing && !text.trim() && !photo ? (
+                <Pressable
+                  onPress={() => {
+                    tap();
+                    voice.start();
+                  }}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Записать голосовое"
+                  style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', opacity: busy ? 0.5 : 1 }}
+                >
+                  <Icon name="mic" size={21} color={t.onAccent} stroke={2.1} />
+                </Pressable>
+              ) : (
+                <Pressable onPress={submit} disabled={busy} accessibilityRole="button" accessibilityLabel={editing ? 'Сохранить' : 'Отправить'} style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: t.accent, alignItems: 'center', justifyContent: 'center', opacity: text.trim() || photo ? 1 : 0.5 }}>
+                  <Icon name={editing ? 'check' : 'send'} size={20} color={t.onAccent} stroke={editing ? 2.6 : 1.9} />
+                </Pressable>
+              )}
+            </Glass>
+          )}
         </View>
       </KeyboardAvoidingView>
       <Modal visible={!!menu} transparent animationType="fade" onRequestClose={() => setMenu(null)}>
@@ -479,7 +553,7 @@ export default function Chat() {
                       tap('success');
                     } else if (o.key === 'task') {
                       setMenu(null);
-                      router.push({ pathname: '/new-task', params: { text: m.text || 'По фото из чата', ch: m.channel, to: isMine(m) ? undefined : m.userId } });
+                      router.push({ pathname: '/new-task', params: { text: m.text || (isVoice(m.photo) ? 'По голосовому из чата' : 'По фото из чата'), ch: m.channel, to: isMine(m) ? undefined : m.userId } });
                     } else if (o.key === 'edit') startEdit(m);
                     else doDelete(m);
                   }}

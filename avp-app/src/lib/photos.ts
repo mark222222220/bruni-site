@@ -21,11 +21,15 @@ export async function pickPhoto(from: 'camera' | 'library'): Promise<string | nu
 
 /** Загружает фото в закрытое хранилище и возвращает путь. В демо-режиме — сам файл на телефоне. */
 export async function uploadPhoto(uri: string, folder: 'chat' | 'stock'): Promise<string> {
+  return uploadFile(uri, `${folder}/${new Date().toISOString().slice(0, 7)}/${uid()}.jpg`, 'image/jpeg');
+}
+
+/** Загрузка файла в закрытое хранилище; в демо-режиме возвращает сам файл на телефоне. */
+export async function uploadFile(uri: string, path: string, contentType: string): Promise<string> {
   if (!supabase) return uri;
   const body = await (await fetch(uri)).arrayBuffer();
-  const path = `${folder}/${new Date().toISOString().slice(0, 7)}/${uid()}.jpg`;
-  const { error } = await supabase.storage.from('photos').upload(path, body, { contentType: 'image/jpeg' });
-  if (error) throw new Error(/bucket|not found/i.test(error.message) ? 'Фото ещё не включены в базе — попросите руководителя' : error.message);
+  const { error } = await supabase.storage.from('photos').upload(path, body, { contentType });
+  if (error) throw new Error(/bucket|not found/i.test(error.message) ? 'Файлы ещё не включены в базе — попросите руководителя выполнить SQL' : error.message);
   return path;
 }
 

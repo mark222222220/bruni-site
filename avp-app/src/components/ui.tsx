@@ -25,7 +25,7 @@ import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '0.8.0';
+export const APP_BUILD = '0.9.0';
 const SECRETS = ['Гласс-Хаус Крым — сила! 🏆', 'Сделано с любовью к стеклу 🪟', 'Ты нашёл пасхалку! 🥚', 'Стекло прозрачное, цифры тоже 😎'];
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -449,6 +449,7 @@ const PATHS: Record<string, string[]> = {
   doc: ['M6 3h9l4 4v14H6z', 'M14 3v5h5', 'M9 13h7M9 17h5'],
   trash: ['M4 7h16', 'M9 7V4h6v3', 'M6 7l1 13h10l1-13'],
   lock: ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4'],
+  mic: ['M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z', 'M5 11a7 7 0 0 0 14 0M12 18v3'],
 };
 export function Icon({ name, size = 22, color, stroke = 1.9 }: { name: string; size?: number; color?: string; stroke?: number }) {
   const { t } = useSettings();

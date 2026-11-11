@@ -3,7 +3,7 @@
     "name": "AVP system",
     "slug": "avp-system",
     "scheme": "avp",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -55,7 +55,13 @@
           "faceIDPermission": "AVP спрашивает Face ID, чтобы цифры завода не увидел посторонний."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "AVP записывает голосовые сообщения для чата команды."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
