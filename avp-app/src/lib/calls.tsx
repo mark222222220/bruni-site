@@ -1,12 +1,11 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { router } from 'expo-router';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, Vibration, View } from 'react-native';
+import { Modal, Platform, Pressable, Vibration, View } from 'react-native';
 import { APP_BUILD, Avatar, Fill, Icon, T, Wallpaper } from '@/components/ui';
 import { useAuth } from './auth';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 import { useSettings } from './settings';
 import { useTeam } from './team';
 import { supabase } from './supabase';
@@ -128,7 +127,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       pushCallRef.current(c, 'ring');
       router.push({ pathname: '/call', params: { id: c.id } });
     },
-    [profile, people],
+    [profile],
   );
   const pushCall = useCallback(
     (c: CallInfo, kind: 'ring' | 'missed') => {

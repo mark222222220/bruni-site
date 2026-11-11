@@ -114,7 +114,8 @@ export default function CallScreen() {
         () => {
           js('window.avp.hangup()');
           setCurrent(null);
-          router.canGoBack() ? router.back() : router.replace('/');
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
         },
         tone === 'busy' ? 2300 : reason ? 1400 : 350,
       );

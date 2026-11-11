@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Confetti } from '@/components/Confetti';
+import { Intro } from '@/components/Intro';
 import { Lock } from '@/components/Lock';
 import { Shake } from '@/components/Shake';
 import { Login } from '@/components/Login';
@@ -75,7 +76,16 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <SettingsProvider>
-        <AuthProvider>{fonts ? <Root /> : <View style={{ flex: 1, backgroundColor: '#08080C' }} />}</AuthProvider>
+        <AuthProvider>
+          {fonts ? (
+            <View style={{ flex: 1 }}>
+              <Root />
+              <Intro />
+            </View>
+          ) : (
+            <View style={{ flex: 1, backgroundColor: '#08080C' }} />
+          )}
+        </AuthProvider>
       </SettingsProvider>
     </SafeAreaProvider>
   );

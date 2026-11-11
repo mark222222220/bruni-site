@@ -23,8 +23,7 @@ export const EMOJI = ['👍', '🔥', '❤️', '😂', '😮', '✅'];
 
 type Data = { people: Person[]; tasks: Task[]; moves: Move[]; marks: Mark[]; reads: Read[]; notes: Note[]; reactions: Reaction[] };
 const EMPTY: Data = { people: [], tasks: [], moves: [], marks: [], reads: [], notes: [], reactions: [] };
-const TABLES = ['tasks', 'moves', 'marks', 'reads', 'notes'] as const;
-const DB: Record<(typeof TABLES)[number] | 'reactions', string> = { tasks: 'tasks', moves: 'stock_moves', marks: 'order_marks', reads: 'chat_reads', notes: 'client_notes', reactions: 'message_reactions' };
+const DB: Record<Exclude<keyof Data, 'people'>, string> = { tasks: 'tasks', moves: 'stock_moves', marks: 'order_marks', reads: 'chat_reads', notes: 'client_notes', reactions: 'message_reactions' };
 const LOCAL = 'avp.team.v1';
 
 type Ctx = Data & {
@@ -61,6 +60,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const [missing, setMissing] = useState(false);
   const dRef = useRef(d);
   dRef.current = d;
+  const sigs = useRef<Partial<Record<keyof Data, string>>>({});
 
   const load = useCallback(async () => {
     if (!supabase) {
@@ -73,16 +73,18 @@ export function TeamProvider({ children }: { children: ReactNode }) {
     const [people, ...rest] = await Promise.all([
       sb.from('profiles').select('*').order('name'),
       sb.from('tasks').select('*').order('at', { ascending: false }).limit(300),
-      sb.from('stock_moves').select('*').order('at', { ascending: false }).limit(1500),
+      sb.from('stock_moves').select('*').order('at', { ascending: false }).limit(500),
       sb.from('order_marks').select('*'),
       sb.from('chat_reads').select('*'),
-      sb.from('client_notes').select('*').order('at', { ascending: false }).limit(500),
-      sb.from('message_reactions').select('*').order('at', { ascending: false }).limit(2000),
+      sb.from('client_notes').select('*').order('at', { ascending: false }).limit(300),
+      sb.from('message_reactions').select('*').order('at', { ascending: false }).limit(800),
     ]);
-    // таблиц нет (SQL 0.7 не выполнен) — работаем без них
+    // нет связи — оставляем то, что уже показано
+    if (people.error && rest.every((r) => r.error)) return;
+    // таблиц нет (SQL не выполнен) — работаем без них
     setMissing(rest.slice(0, 4).some((r) => r.error && /does not exist|schema cache|relation/i.test(r.error.message)));
     const pick = <T,>(r: { data: unknown }) => ((r.data ?? []) as T[]);
-    setD({
+    const next: Data = {
       people: pick<Person>(people),
       tasks: pick<Task>(rest[0]).map((x) => ({ ...num(x), done_at: x.done_at ? Number(x.done_at) : null })),
       moves: pick<Move>(rest[1]).map((x) => ({ ...num(x), qty: Number(x.qty), kind: x.kind ?? 'in', order_no: x.order_no ?? null })),
@@ -90,24 +92,44 @@ export function TeamProvider({ children }: { children: ReactNode }) {
       reads: pick<Read>(rest[3]).map(num),
       notes: pick<Note>(rest[4]).map(num),
       reactions: pick<Reaction>(rest[5]).map(num),
-    });
+    };
+    // меняем только те списки, что действительно изменились: иначе всё приложение перерисовывалось бы при каждой проверке
+    const changed: Partial<Data> = {};
+    for (const k of Object.keys(next) as (keyof Data)[]) {
+      const sig = JSON.stringify(next[k]);
+      if (sigs.current[k] !== sig) {
+        sigs.current[k] = sig;
+        (changed as Record<string, unknown>)[k] = next[k];
+      }
+    }
+    if (Object.keys(changed).length) setD((p) => ({ ...p, ...changed }));
   }, [s.name, s.role]);
 
   useEffect(() => {
     load().catch(() => {});
     if (!supabase) return;
     const sb = supabase;
-    const refresh = () => load().catch(() => {});
+    let soon: ReturnType<typeof setTimeout> | null = null;
+    // несколько изменений подряд — одна перезагрузка
+    const refresh = () => {
+      if (soon) return;
+      soon = setTimeout(() => {
+        soon = null;
+        load().catch(() => {});
+      }, 250);
+    };
     let ch = sb.channel('avp-team');
     for (const t of Object.values(DB)) ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, refresh);
     sb.auth.getSession().then(({ data }) => {
       if (data.session) sb.realtime.setAuth(data.session.access_token);
       ch.subscribe();
     });
-    const timer = setInterval(refresh, 8000);
+    // подстраховка к живому каналу; в фоне не опрашиваем
+    const timer = setInterval(() => AppState.currentState === 'active' && refresh(), 12000);
     const app = AppState.addEventListener('change', (st) => st === 'active' && refresh());
     return () => {
       clearInterval(timer);
+      if (soon) clearTimeout(soon);
       app.remove();
       sb.removeChannel(ch);
     };
@@ -132,8 +154,8 @@ export function TeamProvider({ children }: { children: ReactNode }) {
         if (m?.active) ids.add(id);
         if (m?.typing && id !== profile.id) ty.push({ id, name: m.name, ch: m.typing });
       }
-      setOnline(ids);
-      setTypingList(ty);
+      setOnline((p) => (p.size === ids.size && [...ids].every((x) => p.has(x)) ? p : ids));
+      setTypingList((p) => (JSON.stringify(p) === JSON.stringify(ty) ? p : ty));
     };
     ch.on('presence', { event: 'sync' }, sync);
     sb.auth.getSession().then(({ data }) => {
@@ -152,11 +174,15 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   }, [profile]);
   const setTyping = useCallback(
     (ch: string | null) => {
+      const put = (v: string | null) => {
+        if (typingCh.current === v) return;
+        typingCh.current = v;
+        presence.current?.track({ name: myName, typing: v, active: true });
+      };
       if (typingTimer.current) clearTimeout(typingTimer.current);
-      if (ch) typingTimer.current = setTimeout(() => setTyping(null), 4000);
-      if (typingCh.current === ch) return;
-      typingCh.current = ch;
-      presence.current?.track({ name: myName, typing: ch, active: true });
+      // перестал печатать — через 4 секунды надпись у коллег пропадает сама
+      if (ch) typingTimer.current = setTimeout(() => put(null), 4000);
+      put(ch);
     },
     [myName],
   );
@@ -164,6 +190,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   /** Сначала меняем экран, потом базу; при ошибке перечитываем. */
   const apply = useCallback(
     async (local: (d: Data) => Data, remote: () => PromiseLike<{ error: { message: string } | null }>): Promise<string | null> => {
+      sigs.current = {};
       setD((p) => {
         const n = local(p);
         if (!supabase) AsyncStorage.setItem(LOCAL, JSON.stringify({ ...n, people: [] })).catch(() => {});

@@ -73,7 +73,8 @@ export function localBackend(): Backend {
 /* ---------- закрытая база Supabase: вся команда ---------- */
 export function cloudBackend(sb: SupabaseClient): Backend {
   const fetchMessages = async (): Promise<Message[]> => {
-    const { data, error } = await sb.from('messages').select('*').order('at', { ascending: false }).limit(300);
+    // служебный канал отчётов о звонках в чат не попадает
+    const { data, error } = await sb.from('messages').select('*').neq('channel', 'debug').order('at', { ascending: false }).limit(300);
     if (error) throw error;
     return ((data ?? []) as (Message & { user_id?: string; edited_at?: number | null })[]).map((m) => ({
       photo: m.photo ?? null,
@@ -88,6 +89,9 @@ export function cloudBackend(sb: SupabaseClient): Backend {
       editedAt: m.edited_at ? Number(m.edited_at) : null,
     }));
   };
+  // что уже показано на экране: по этому решаем, изменилось ли что-то на сервере
+  let known: Message[] | null = null;
+  const signature = (rows: Message[]) => `${rows.length}:${rows[0]?.id ?? ''}:${rows.reduce((a, m) => a + (m.editedAt ?? 0), 0)}`;
   const fetchSheets = async () => {
     const { data, error } = await sb.from('factory_snapshot').select('section,data,updated_at');
     if (error) throw error;
@@ -96,18 +100,44 @@ export function cloudBackend(sb: SupabaseClient): Backend {
   return {
     kind: 'cloud',
     async load() {
-      return { clients: [], orders: [], stock: [], payments: [], messages: await fetchMessages() };
+      known = await fetchMessages();
+      return { clients: [], orders: [], stock: [], payments: [], messages: known };
     },
     loadSheets: fetchSheets,
     subscribe(onTable) {
-      let last = '';
-      const pushMessages = (rows: Message[]) => {
-        const key = rows.length + ':' + (rows[0]?.id ?? '');
-        if (key === last) return;
-        last = key;
-        onTable('messages', rows);
+      let shown = known ? signature(known) : '';
+      let busy = false;
+      let again = false;
+      const full = async () => {
+        if (busy) {
+          again = true;
+          return;
+        }
+        busy = true;
+        try {
+          const rows = await fetchMessages();
+          known = rows;
+          const sig = signature(rows);
+          if (sig !== shown) {
+            shown = sig;
+            onTable('messages', rows);
+          }
+        } catch {}
+        busy = false;
+        if (again) {
+          again = false;
+          void full();
+        }
       };
-      const refresh = () => fetchMessages().then(pushMessages).catch(() => {});
+      // лёгкая проверка раз в 4 секунды: «есть ли что-то новее показанного?» — ответ почти всегда пустой и весит сотню байт
+      const probe = async () => {
+        if (!known) return full();
+        const lastAt = known.reduce((a, m) => Math.max(a, m.at), 0);
+        const lastEdit = known.reduce((a, m) => Math.max(a, m.editedAt ?? 0), 0);
+        const { data, error } = await sb.from('messages').select('id').neq('channel', 'debug').or(`at.gt.${lastAt},edited_at.gt.${lastEdit}`).limit(1);
+        if (error || data?.length) return full();
+      };
+      const refresh = () => void full();
       const ch = sb
         .channel('avp-live')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, refresh)
@@ -124,8 +154,13 @@ export function cloudBackend(sb: SupabaseClient): Backend {
         if (data.session) sb.realtime.setAuth(data.session.access_token);
         ch.subscribe();
       });
-      // подстраховка: проверяем новые сообщения раз в 4 секунды и при возврате в приложение
-      const timer = setInterval(refresh, 4000);
+      // подстраховка к живому каналу: лёгкая проверка каждые 4 с, полная сверка (удалённые сообщения) — раз в 40 с
+      let n = 0;
+      const timer = setInterval(() => {
+        if (AppState.currentState !== 'active') return;
+        n += 1;
+        void (n % 10 === 0 ? full() : probe());
+      }, 4000);
       const app = AppState.addEventListener('change', (st) => st === 'active' && refresh());
       return () => {
         clearInterval(timer);

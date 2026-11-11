@@ -17,6 +17,8 @@ export type Settings = {
   notify: boolean;
   /** вход по Face ID / Touch ID */
   lock: boolean;
+  /** «живое стекло»: блик от наклона телефона, заставка при запуске */
+  motion: boolean;
   thr: number;
   name: string;
   role: Role;
@@ -32,6 +34,7 @@ export const DEFAULTS: Settings = {
   badges: true,
   notify: true,
   lock: false,
+  motion: true,
   thr: 15,
   name: '',
   role: 'boss',
@@ -209,7 +212,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [s.haptics],
   );
 
-  const t = useMemo(() => makeTheme(s, system), [s, system]);
+  // тема зависит только от оформления: чтение сообщений и прочие настройки её не пересоздают
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const t = useMemo(() => makeTheme(s, system), [s.skin, s.accent, s.big, system]);
   const value = useMemo(() => ({ s, t, ready, set, reset, tap }), [s, t, ready, set, reset, tap]);
   return <SettingsCtx.Provider value={value}>{children}</SettingsCtx.Provider>;
 }

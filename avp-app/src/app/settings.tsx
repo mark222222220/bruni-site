@@ -88,6 +88,7 @@ export default function Settings() {
         <Item title="Вибрация при нажатиях" sub="лёгкий отклик кнопок" right={<Toggle label="Вибрация" value={s.haptics} onChange={(v) => set({ haptics: v })} />} />
         <Item title="Счётчик непрочитанных" sub="цифра на вкладке «Чаты»" right={<Toggle label="Счётчик" value={s.badges} onChange={(v) => set({ badges: v })} />} />
         <Item title="Уведомления" sub="сообщения, задачи, заказы и утренняя сводка в 8:00" right={<Toggle label="Уведомления" value={s.notify} onChange={(v) => set({ notify: v })} />} />
+        <Item title="Живое стекло" sub="блик ходит за наклоном телефона, заставка при запуске" right={<Toggle label="Живое стекло" value={s.motion} onChange={(v) => set({ motion: v })} />} />
         <Item title="Вход по Face ID" sub={bioMsg || 'спрашивать лицо при открытии приложения'} right={<Toggle label="Вход по Face ID" value={s.lock} onChange={toggleLock} />} />
       </List>
 

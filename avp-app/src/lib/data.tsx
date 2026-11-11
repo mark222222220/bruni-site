@@ -7,7 +7,6 @@ import { addDays, dm, fmt, money, today, tomorrow, uid } from './format';
 import { getSheets, setSheets, tablesFromSheets, useSheets, type Sheets } from './sheets';
 import { useTeam, type Mark, type Move } from './team';
 import { notifyTeamAboutMessage } from './notifications';
-import { supabase } from './supabase';
 import { useSettings } from './settings';
 import { STATUSES, type Snapshot, type TableName, type Tables } from './types';
 
@@ -157,12 +156,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     async (channel: string, text: string, quote?: string | null, photo?: string | null) => {
       const ok = await upsert('messages', { id: uid(), channel, author: s.name || 'Сотрудник', role: s.role, text: text.trim(), quote: quote ?? null, at: Date.now(), photo: photo ?? null });
       // коллегам — уведомление на телефон
-      if (ok && backend.kind === 'cloud' && supabase) {
-        supabase.auth.getUser().then(({ data }) => data.user && notifyTeamAboutMessage(data.user.id, s.name || 'Сотрудник', channel, text.trim() || (photo && /^voice\/|\.(m4a|caf|webm|aac)$/i.test(photo) ? '🎤 Голосовое сообщение' : '📷 Фото')));
+      if (ok && backend.kind === 'cloud' && profile) {
+        const voice = !!photo && /^voice\/|\.(m4a|caf|webm|aac)$/i.test(photo);
+        void notifyTeamAboutMessage(profile.id, s.name || 'Сотрудник', channel, text.trim() || (voice ? '🎤 Голосовое сообщение' : '📷 Фото'));
       }
       return ok;
     },
-    [upsert, s.name, s.role, backend.kind],
+    [upsert, s.name, s.role, backend.kind, profile],
   );
   const editMessage = useCallback((id: string, text: string) => patch('messages', id, { text: text.trim(), editedAt: Date.now() }), [patch]);
   const deleteMessage = useCallback((id: string) => remove('messages', id), [remove]);

@@ -66,6 +66,8 @@ export async function notifyTeamAboutMessage(myId: string, myName: string, chann
   ]);
 }
 
+const handled = new Set<string>();
+
 /** Регистрирует телефон для уведомлений после входа и открывает нужный чат по нажатию на уведомление. */
 export function NotificationsBridge() {
   const { profile } = useAuth();
@@ -89,7 +91,11 @@ export function NotificationsBridge() {
 
   useEffect(() => {
     const open = (r: Notifications.NotificationResponse | null) => {
-      const d = r?.notification.request.content.data as { kind?: string; channel?: string } | undefined;
+      // одно и то же нажатие обрабатываем один раз (иначе при повторном входе снова перекинет в чат)
+      const key = r?.notification.request.identifier;
+      if (!r || !key || handled.has(key)) return;
+      handled.add(key);
+      const d = r.notification.request.content.data as { kind?: string; channel?: string } | undefined;
       if (d?.kind === 'chat') router.navigate({ pathname: '/chat', params: { ch: d.channel ?? 'general' } });
       else if (d?.kind === 'task') router.navigate('/tasks');
       else if (d?.kind === 'order') router.navigate('/orders');

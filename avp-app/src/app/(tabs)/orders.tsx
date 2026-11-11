@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { Appear, Banner, Button, Card, Empty, Glass, Icon, Pill, Screen, Segmented, Steps, T, styles } from '@/components/ui';
 import { statusIndex, statusName, useData } from '@/lib/data';
@@ -8,6 +8,7 @@ import { useSettings } from '@/lib/settings';
 import type { Order } from '@/lib/types';
 
 type F = 'work' | 'ready' | 'shipped' | 'all';
+const PAGE = 20;
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -22,7 +23,8 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function OrderCard({ o }: { o: Order }) {
+/** memo: карточка не перерисовывается, пока сам заказ не изменился (поиск и «показать ещё» остаются быстрыми). */
+const OrderCard = memo(function OrderCard({ o }: { o: Order }) {
   const { t } = useSettings();
   const T0 = today();
   const late = o.status !== 'shipped' && !!o.ship && o.ship < T0;
@@ -64,13 +66,15 @@ function OrderCard({ o }: { o: Order }) {
       </View>
     </Card>
   );
-}
+});
 
 export default function Orders() {
   const { snap, loading, offlineAt } = useData();
   const { s, t } = useSettings();
   const [f, setF] = useState<F>('work');
   const [q, setQ] = useState('');
+  // длинный список рисуем порциями — экран открывается сразу
+  const [shown, setShown] = useState(PAGE);
   const n = (k: F) => snap.orders.filter((o) => (k === 'work' ? o.status !== 'shipped' : k === 'all' ? true : o.status === k)).length;
   const list = useMemo(() => {
     let L = snap.orders.filter((o) => (f === 'work' ? o.status !== 'shipped' : f === 'all' ? true : o.status === f));
@@ -97,7 +101,10 @@ export default function Orders() {
       </Glass>
       <Segmented
         value={f}
-        onChange={setF}
+        onChange={(v) => {
+          setF(v);
+          setShown(PAGE);
+        }}
         options={[
           { value: 'work', label: `В работе · ${n('work')}` },
           { value: 'ready', label: `Готовы · ${n('ready')}` },
@@ -107,11 +114,18 @@ export default function Orders() {
       />
       {offlineAt ? <Banner tone="bad" text={`Нет связи — данные от ${new Date(offlineAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`} /> : loading ? <Banner text="Загружаю заказы…" /> : null}
       {list.length ? (
-        list.map((o, i) => (
-          <Appear key={o.id} i={i}>
-            <OrderCard o={o} />
-          </Appear>
-        ))
+        <>
+          {list.slice(0, shown).map((o, i) => (
+            <Appear key={o.id} i={i < PAGE ? i : 0}>
+              <OrderCard o={o} />
+            </Appear>
+          ))}
+          {list.length > shown ? (
+            <View style={{ flexDirection: 'row' }}>
+              <Button title={`Показать ещё ${Math.min(PAGE, list.length - shown)} из ${list.length - shown}`} kind="ghost" onPress={() => setShown((n) => n + PAGE)} />
+            </View>
+          ) : null}
+        </>
       ) : (
         <Card>
           <Empty text={q ? 'Ничего не нашлось.' : 'Здесь пока пусто.'} />

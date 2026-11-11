@@ -1,5 +1,5 @@
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus, useAudioRecorder } from 'expo-audio';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { T } from '@/components/ui';
@@ -69,23 +69,41 @@ export function useVoiceRecorder() {
   return { recording: !!startedAt, elapsed, error, start, stop: () => finish(true), cancel: () => finish(false), tooLong: elapsed >= MAX_MS };
 }
 
-/** Пузырь голосового: кнопка, «волна» с прогрессом, время. */
-export function VoiceBubble({ path, light, seed }: { path: string; light?: boolean; seed: string }) {
-  const { t } = useSettings();
-  // файл скачиваем только когда нажали «слушать»
+type BubbleProps = { path: string; light?: boolean; seed: string };
+
+/** Пузырь голосового: кнопка, «волна» с прогрессом, время. Проигрыватель создаётся только после первого нажатия — сотня голосовых в чате ничего не весит. */
+export function VoiceBubble(p: BubbleProps) {
   const [armed, setArmed] = useState(false);
-  const url = usePhotoUrl(armed ? path : null);
-  const player = useAudioPlayer(armed && url ? { uri: url.split('#voice_')[0] } : null);
+  return armed ? <VoicePlayer {...p} /> : <VoiceShell {...p} playing={false} loading={false} pos={0} total={durationOf(p.path)} onPress={() => setArmed(true)} />;
+}
+
+function VoicePlayer({ path, light, seed }: BubbleProps) {
+  const url = usePhotoUrl(path);
+  const player = useAudioPlayer(url ? { uri: url.split('#voice_')[0] } : null);
   const st = useAudioPlayerStatus(player);
-  const [wantPlay, setWantPlay] = useState(false);
+  // нажали «слушать» — играем, как только файл загрузится
+  const want = useRef(true);
   useEffect(() => {
-    if (wantPlay && st.isLoaded) {
-      setWantPlay(false);
+    if (want.current && st.isLoaded) {
+      want.current = false;
+      setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
       player.play();
     }
-  }, [wantPlay, st.isLoaded, player]);
+  }, [st.isLoaded, player]);
   const total = (st.duration ? st.duration * 1000 : 0) || durationOf(path);
   const pos = (st.currentTime ?? 0) * 1000;
+  const toggle = async () => {
+    if (!st.isLoaded) return;
+    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
+    if (st.playing) return player.pause();
+    if (st.didJustFinish || (total && pos >= total - 150)) await player.seekTo(0);
+    player.play();
+  };
+  return <VoiceShell path={path} light={light} seed={seed} playing={st.playing} loading={!st.isLoaded} pos={pos} total={total} onPress={toggle} />;
+}
+
+function VoiceShell({ light, seed, playing, loading, pos, total, onPress }: BubbleProps & { playing: boolean; loading: boolean; pos: number; total: number; onPress: () => void }) {
+  const { t } = useSettings();
   const progress = total ? Math.min(1, pos / total) : 0;
   const ink = light ? t.onAccent : t.fg;
   const bars = useMemo(() => {
@@ -96,23 +114,11 @@ export function VoiceBubble({ path, light, seed }: { path: string; light?: boole
       return 0.25 + ((h >>> 16) % 100) / 133 + (i % 7 === 3 ? 0.15 : 0);
     });
   }, [seed]);
-  const toggle = async () => {
-    await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: false }).catch(() => {});
-    if (!armed || !st.isLoaded) {
-      setArmed(true);
-      setWantPlay(true);
-      return;
-    }
-    if (st.playing) return player.pause();
-    if (st.didJustFinish || (total && pos >= total - 150)) await player.seekTo(0);
-    player.play();
-  };
-  const loading = wantPlay && !st.isLoaded;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 210 }}>
-      <Pressable onPress={toggle} accessibilityRole="button" accessibilityLabel={st.playing ? 'Пауза' : 'Слушать голосовое'} hitSlop={6} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: light ? 'rgba(17,17,19,0.85)' : t.accent, alignItems: 'center', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
+      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={playing ? 'Пауза' : 'Слушать голосовое'} hitSlop={6} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: light ? 'rgba(17,17,19,0.85)' : t.accent, alignItems: 'center', justifyContent: 'center', opacity: loading ? 0.6 : 1 }}>
         <Svg width={16} height={16} viewBox="0 0 16 16">
-          {st.playing ? <Path d="M4 3h3v10H4zM9 3h3v10H9z" fill={light ? t.accent2 : t.onAccent} /> : <Path d="M5 2.5l8 5.5-8 5.5z" fill={light ? t.accent2 : t.onAccent} />}
+          {playing ? <Path d="M4 3h3v10H4zM9 3h3v10H9z" fill={light ? t.accent2 : t.onAccent} /> : <Path d="M5 2.5l8 5.5-8 5.5z" fill={light ? t.accent2 : t.onAccent} />}
         </Svg>
       </Pressable>
       <View style={{ flex: 1, gap: 4 }}>
@@ -122,7 +128,7 @@ export function VoiceBubble({ path, light, seed }: { path: string; light?: boole
           ))}
         </View>
         <T v="small" style={{ fontSize: 11, color: ink, opacity: 0.75 }}>
-          {st.playing || pos > 0 ? `${clock(pos)} / ${clock(total)}` : clock(total)}
+          {loading ? 'загружаю…' : playing || pos > 0 ? `${clock(pos)} / ${clock(total)}` : clock(total)}
         </T>
       </View>
     </View>

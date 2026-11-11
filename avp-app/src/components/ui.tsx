@@ -1,10 +1,11 @@
 import { BlurView } from 'expo-blur';
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -19,13 +20,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { celebrate } from '@/lib/fun';
+import { tiltX, tiltY, useTilt } from '@/lib/motion';
 import { useSettings, type Theme } from '@/lib/settings';
 import { ROLES } from '@/lib/types';
 
 /** Метка сборки: видно, какая версия открыта на телефоне. */
-export const APP_BUILD = '1.2.4';
+export const APP_BUILD = '1.3.0';
 const SECRETS = ['Гласс-Хаус Крым — сила! 🏆', 'Сделано с любовью к стеклу 🪟', 'Ты нашёл пасхалку! 🥚', 'Стекло прозрачное, цифры тоже 😎'];
 const LIQUID = Platform.OS === 'ios' && isLiquidGlassAvailable();
 const useSvgId = () => 'g' + useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -77,6 +79,11 @@ export function Fill({ colors, radius = 0, vertical = true, opacity = 1 }: { col
 /** Мягкое круглое свечение. */
 export function Glow({ color, size, style, opacity = 0.35 }: { color: string; size: number; style?: StyleProp<ViewStyle>; opacity?: number }) {
   const id = useSvgId();
+  if (Platform.OS !== 'web') {
+    // на телефоне свечение рисует система: без SVG и без огромной картинки в памяти
+    const bg = `radial-gradient(circle closest-side at 50% 50%, ${hexA(color, opacity)} 0%, ${hexA(color, opacity * 0.3)} 45%, ${hexA(color, 0)} 100%)`;
+    return <View pointerEvents="none" style={[{ position: 'absolute', width: size, height: size, borderRadius: size / 2, experimental_backgroundImage: bg }, style]} />;
+  }
   return (
     <Svg width={size} height={size} style={[{ position: 'absolute' }, style]} pointerEvents="none">
       <Defs>
@@ -91,24 +98,14 @@ export function Glow({ color, size, style, opacity = 0.35 }: { color: string; si
   );
 }
 
+/** Точечная сетка: маленькая картинка-плитка, которую система сама размножает по экрану. */
 function Dots() {
-  const id = useSvgId();
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  return (
-    <View style={StyleSheet.absoluteFill} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
-      {box.w ? (
-        <Svg width={box.w} height={box.h}>
-          <Defs>
-            <Pattern id={id} width="26" height="26" patternUnits="userSpaceOnUse">
-              <Circle cx="2" cy="2" r="1" fill="#FFFFFF" fillOpacity={0.055} />
-            </Pattern>
-          </Defs>
-          <Rect width={box.w} height={box.h} fill={`url(#${id})`} />
-        </Svg>
-      ) : null}
-    </View>
-  );
+  // размеры задаём явно: иначе картинка берёт свой родной размер 26×26
+  return <Image source={require('../../assets/dots.png')} resizeMode="repeat" style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }} />;
 }
+
+const DRIFT_A = { inputRange: [-1, 1], outputRange: [-22, 22] };
+const DRIFT_B = { inputRange: [-1, 1], outputRange: [16, -16] };
 
 /** Фон экрана: фирменный тёмный с оранжевым свечением и точечной сеткой, либо фон выбранной темы. */
 export function Wallpaper() {
@@ -116,8 +113,13 @@ export function Wallpaper() {
   if (t.premium)
     return (
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: t.bg, overflow: 'hidden' }]}>
-        <Glow color={t.accent} size={760} opacity={0.32} style={{ top: -380, right: -300 }} />
-        <Glow color="#3A3A44" size={700} opacity={0.5} style={{ bottom: -360, left: -320 }} />
+        {/* свечение чуть плывёт за наклоном телефона — фон кажется глубже */}
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tiltX.interpolate(DRIFT_A) }, { translateY: tiltY.interpolate(DRIFT_A) }] }]}>
+          <Glow color={t.accent} size={760} opacity={0.32} style={{ top: -380, right: -300 }} />
+        </Animated.View>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tiltX.interpolate(DRIFT_B) }, { translateY: tiltY.interpolate(DRIFT_B) }] }]}>
+          <Glow color="#3A3A44" size={700} opacity={0.5} style={{ bottom: -360, left: -320 }} />
+        </Animated.View>
         <Dots />
       </View>
     );
@@ -192,22 +194,35 @@ export function Card({ children, style, onPress, tone, radius = 24 }: { children
   );
 }
 
-/** Главная оранжевая карточка с водяным знаком AVP. */
+/** Главная оранжевая карточка с водяным знаком AVP. По ней ходит блик, как по настоящему стеклу, — следом за наклоном телефона. */
 export function HeroCard({ children, onPress }: { children: ReactNode; onPress?: () => void }) {
-  const { t } = useSettings();
+  const { t, s } = useSettings();
+  const focused = useIsFocused();
+  useTilt(s.motion && focused);
   return (
     <Press onPress={onPress}>
       <View style={{ borderRadius: 30, overflow: 'hidden', padding: 22, gap: 6, zIndex: 0, ...shadow(t.accent, 0.45, 30) }}>
         <Fill colors={[t.accent2, t.accent, t.accent3]} radius={30} vertical={false} />
-        <View style={{ position: 'absolute', right: -30, bottom: -26, opacity: 0.16 }} pointerEvents="none">
+        <Animated.View style={{ position: 'absolute', right: -30, bottom: -26, opacity: 0.16, transform: [{ translateX: tiltX.interpolate(DEPTH) }, { translateY: tiltY.interpolate(DEPTH) }] }} pointerEvents="none">
           <Mark width={260} ink="#000" />
-        </View>
-        <Glow color="#FFFFFF" size={260} opacity={0.35} style={{ top: -140, left: -90 }} />
+        </Animated.View>
+        <Animated.View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, transform: [{ translateX: tiltX.interpolate(SHINE) }, { translateY: tiltY.interpolate(SHINE) }] }}>
+          <Glow color="#FFFFFF" size={260} opacity={0.35} style={{ top: -140, left: -90 }} />
+        </Animated.View>
+        {s.motion ? (
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', top: -60, bottom: -60, left: '50%', width: 150, marginLeft: -75, opacity: tiltY.interpolate(GLARE_O), transform: [{ translateX: tiltX.interpolate(GLARE_X) }, { rotate: '16deg' }] }}>
+            <Fill colors={['#FFFFFF00', '#FFFFFF59', '#FFFFFF00']} vertical={false} />
+          </Animated.View>
+        ) : null}
         {children}
       </View>
     </Press>
   );
 }
+const DEPTH = { inputRange: [-1, 1], outputRange: [10, -10] };
+const SHINE = { inputRange: [-1, 1], outputRange: [-26, 26] };
+const GLARE_X = { inputRange: [-1, 1], outputRange: [-210, 210] };
+const GLARE_O = { inputRange: [-1, 0, 1], outputRange: [0.55, 0.85, 1] };
 
 export function List({ children }: { children: ReactNode }) {
   return <Glass radius={24} style={{ paddingVertical: 2 }}>{children}</Glass>;
@@ -246,10 +261,14 @@ export function Item({ title, sub, right, onPress, first, children, leading }: {
    Текст
    ========================================================= */
 type TP = { children?: ReactNode; style?: StyleProp<TextStyle>; numberOfLines?: number; selectable?: boolean };
-export function T({ children, style, numberOfLines, selectable, v = 'body' }: TP & { v?: 'title' | 'h' | 'body' | 'b' | 'small' | 'label' | 'kicker' | 'num' | 'big' | 'huge' }) {
-  const { t } = useSettings();
+type TV = 'title' | 'h' | 'body' | 'b' | 'small' | 'label' | 'kicker' | 'num' | 'big' | 'huge';
+// стили текста считаем один раз на тему, а не на каждую надпись
+const textStyles = new WeakMap<Theme, Record<TV, TextStyle>>();
+function stylesFor(t: Theme) {
+  let base = textStyles.get(t);
+  if (base) return base;
   const k = t.fs / 16;
-  const base: Record<string, TextStyle> = {
+  base = {
     huge: { fontFamily: 'Rubik_800ExtraBold', fontSize: 54 * k, letterSpacing: -1.6, color: t.fg, fontVariant: ['tabular-nums'], lineHeight: 58 * k },
     title: { fontFamily: 'Rubik_800ExtraBold', fontSize: 34 * k, letterSpacing: -0.9, color: t.fg, lineHeight: 38 * k },
     h: { fontFamily: 'Rubik_700Bold', fontSize: 20 * k, color: t.fg, letterSpacing: -0.3 },
@@ -261,8 +280,13 @@ export function T({ children, style, numberOfLines, selectable, v = 'body' }: TP
     num: { fontFamily: 'Rubik_700Bold', fontSize: 18 * k, color: t.fg, fontVariant: ['tabular-nums'] },
     big: { fontFamily: 'Rubik_800ExtraBold', fontSize: 36 * k, letterSpacing: -1, color: t.fg, fontVariant: ['tabular-nums'], lineHeight: 40 * k },
   };
+  textStyles.set(t, base);
+  return base;
+}
+export function T({ children, style, numberOfLines, selectable, v = 'body' }: TP & { v?: TV }) {
+  const { t } = useSettings();
   return (
-    <Text style={[base[v], style]} numberOfLines={numberOfLines} selectable={selectable} maxFontSizeMultiplier={1.4}>
+    <Text style={[stylesFor(t)[v], style]} numberOfLines={numberOfLines} selectable={selectable} maxFontSizeMultiplier={1.4}>
       {children}
     </Text>
   );
@@ -288,7 +312,7 @@ export function CountUp({ value, format, style, v = 'big' }: { value: number; fo
 export function Appear({ children, i = 0 }: { children: ReactNode; i?: number }) {
   const a = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(a, { toValue: 1, duration: 520, delay: 60 + i * 70, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(a, { toValue: 1, duration: 520, delay: 60 + Math.min(i, 8) * 70, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [a, i]);
   return <Animated.View style={{ opacity: a, transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }}>{children}</Animated.View>;
 }
@@ -722,7 +746,7 @@ export function Field({ label, style, ...p }: TextInputProps & { label: string }
           setFocus(false);
           p.onBlur?.(e);
         }}
-        style={[styles.input, { backgroundColor: t.field, color: t.fg, borderColor: focus ? t.accent : t.line }]}
+        style={[styles.input, { backgroundColor: t.field, color: t.fg, borderColor: focus ? t.accent : t.line }, p.multiline ? { height: undefined, minHeight: 84, maxHeight: 180, paddingTop: 13, paddingBottom: 13, textAlignVertical: 'top' } : null]}
       />
     </View>
   );

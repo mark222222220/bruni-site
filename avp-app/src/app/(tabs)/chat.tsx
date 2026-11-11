@@ -1,7 +1,7 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { ActivityIndicator, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Avatar, Fill, Glass, Icon, IconButton, Screen, T, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
@@ -47,6 +47,107 @@ function Rich({ text, color, accent }: { text: string; color: string; accent: st
   );
 }
 
+type Rx = [emoji: string, users: string[]][];
+type RowProps = {
+  m: Message;
+  me: boolean;
+  online: boolean;
+  /** кто-то из коллег уже прочитал (для своих сообщений) */
+  read: boolean;
+  /** имена прочитавших — показываем под последним своим сообщением */
+  readNames: string;
+  reactions?: Rx;
+  myId: string;
+  cloud: boolean;
+  onTap: (m: Message) => void;
+  onLong: (m: Message) => void;
+  onOpen: (url: string) => void;
+  onReact: (m: Message, emoji: string) => void;
+};
+const timeOf = (m: Message) => new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + (m.editedAt ? ' · изм.' : '');
+
+/** Одно сообщение. memo: пока его данные не изменились, оно не перерисовывается — набор текста и новые сообщения не тормозят длинный чат. */
+const MessageRow = memo(function MessageRow({ m, me, online, read, readNames, reactions, myId, cloud, onTap, onLong, onOpen, onReact }: RowProps) {
+  const { t } = useSettings();
+  const media = m.photo ? isVoice(m.photo) ? <VoiceBubble path={m.photo} light={me} seed={m.id} /> : <Photo path={m.photo} onOpen={onOpen} /> : null;
+  return (
+    <View style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '86%', marginVertical: 4 }}>
+      <Pressable onPress={() => onTap(m)} onLongPress={() => onLong(m)} delayLongPress={350}>
+        {me ? (
+          <View>
+            <View style={{ borderRadius: 20, borderTopRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 3, overflow: 'hidden', zIndex: 0 }}>
+              <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
+              {m.quote ? <T v="small" style={{ color: t.onAccent, opacity: 0.75, borderLeftWidth: 3, borderLeftColor: t.onAccent, paddingLeft: 8 }}>{m.quote}</T> : null}
+              {media}
+              {m.text ? <Rich text={m.text} color={t.onAccent} accent={t.onAccent} /> : null}
+              <T v="small" style={{ color: t.onAccent, opacity: 0.7, fontSize: 11, alignSelf: 'flex-end' }}>
+                {timeOf(m)}
+                {cloud ? (read ? '  ✓✓' : '  ✓') : ''}
+              </T>
+            </View>
+            {readNames ? (
+              <T v="small" style={{ fontSize: 11, alignSelf: 'flex-end', marginTop: 3 }}>
+                Прочитали: {readNames}
+              </T>
+            ) : null}
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
+            <View>
+              <Avatar name={m.author} />
+              {online ? <View style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: t.ok, borderWidth: 2, borderColor: t.bg }} /> : null}
+            </View>
+            <Glass radius={20} style={{ borderBottomLeftRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 4, flexShrink: 1 }}>
+              <T v="small" style={{ fontSize: 12 }}>
+                <T v="b" style={{ fontSize: 12, color: t.accent2 }}>
+                  {m.author}
+                </T>
+                {`  ${ROLES[m.role]?.name ?? ''} · ${timeOf(m)}`}
+              </T>
+              {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
+              {media}
+              {m.text ? <Rich text={m.text} color={t.fg} accent={t.accent2} /> : null}
+            </Glass>
+          </View>
+        )}
+      </Pressable>
+      {reactions?.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, alignSelf: me ? 'flex-end' : 'flex-start', marginLeft: me ? 0 : 40 }}>
+          {reactions.map(([e, users]) => {
+            const mine = users.includes(myId);
+            return (
+              <Pressable key={e} onPress={() => onReact(m, e)} accessibilityLabel={`${e} ${users.length}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, backgroundColor: mine ? t.accent + '33' : t.card2, borderWidth: 1, borderColor: mine ? t.accent : 'transparent' }}>
+                <T v="body" style={{ fontSize: 14 }}>
+                  {e}
+                </T>
+                {users.length > 1 ? (
+                  <T v="b" style={{ fontSize: 12 }}>
+                    {users.length}
+                  </T>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+});
+
+function EmptyChat() {
+  return (
+    <View style={{ transform: [{ scaleY: -1 }], padding: 28 }}>
+      <T v="small" style={{ textAlign: 'center' }}>
+        В канале пока тихо. Напишите первое сообщение.
+      </T>
+    </View>
+  );
+}
+const LIST_PAD = { paddingVertical: 12 };
+const styles_flex = { flex: 1 };
+const keyOf = (m: Message) => m.id;
+const NO_READERS: { user_id: string; at: number }[] = [];
+
 export default function Chat() {
   const params = useLocalSearchParams<{ ch?: string; q?: string }>();
   const { snap, send, kind, editMessage, deleteMessage } = useData();
@@ -68,14 +169,26 @@ export default function Chat() {
   const [err, setErr] = useState('');
   const [viewer, setViewer] = useState<string | null>(null);
   const team = useTeam();
-  const isMine = (m: Message) => (m.userId && profile ? m.userId === profile.id : m.author === s.name);
+  const myUid = profile?.id;
+  const isMine = useCallback((m: Message) => (m.userId && myUid ? m.userId === myUid : m.author === s.name), [myUid, s.name]);
   const canDelete = (m: Message) => isMine(m) || s.role === 'boss';
-  const fmtTime = (m: Message) => new Date(m.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + (m.editedAt ? ' · изм.' : '');
-  const openMenu = (m: Message) => {
-    tap();
-    setSure(false);
-    setMenu(m);
-  };
+  const fmtTime = timeOf;
+  const openMenu = useCallback(
+    (m: Message) => {
+      tap();
+      setSure(false);
+      setMenu(m);
+    },
+    [tap],
+  );
+  // экран чата виден прямо сейчас? (вкладка открыта и приложение на экране)
+  const focused = useIsFocused();
+  const [awake, setAwake] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => setAwake(st === 'active'));
+    return () => sub.remove();
+  }, []);
+  const visible = focused && awake;
   const startEdit = (m: Message) => {
     setMenu(null);
     setQuote(null);
@@ -108,18 +221,31 @@ export default function Chat() {
   const msgs = useMemo(() => snap.messages.filter((m) => m.channel === ch).sort((a, b) => b.at - a.at), [snap.messages, ch]);
   const unreadBy = (id: string) => snap.messages.filter((m) => m.channel === id && m.at > (s.seen[id] ?? 0) && m.author !== s.name).length;
 
-  // отмечаем канал прочитанным
+  // отмечаем канал прочитанным — только когда чат действительно на экране
+  const { markRead, toggleReaction } = team;
   useEffect(() => {
+    if (!visible) return;
     const last = msgs[0]?.at ?? 0;
     if (last > (s.seen[ch] ?? 0)) set({ seen: { ...s.seen, [ch]: last } });
-    team.markRead(ch, last);
-  }, [msgs, ch, s.seen, set, team.markRead]);
+    markRead(ch, last);
+  }, [visible, msgs, ch, s.seen, set, markRead]);
 
   // кто из коллег прочитал: время прочтения по этому каналу
-  const readers = team.reads.filter((r) => r.channel === ch && r.user_id !== team.me);
-  const readBy = (m: Message) => readers.filter((r) => r.at >= m.at && r.user_id !== m.userId);
-  const lastMine = msgs.find((m) => isMine(m));
-  const nameOf = (id: string) => firstName(team.people.find((p) => p.id === id)?.name ?? '');
+  const readers = useMemo(() => team.reads.filter((r) => r.channel === ch && r.user_id !== team.me), [team.reads, ch, team.me]);
+  const lastMineId = useMemo(() => msgs.find((m) => isMine(m))?.id, [msgs, isMine]);
+  const names = useMemo(() => new Map(team.people.map((p) => [p.id, firstName(p.name)])), [team.people]);
+  // реакции по сообщениям — считаем один раз на изменение, а не для каждой строки
+  const rx = useMemo(() => {
+    const by = new Map<string, Map<string, string[]>>();
+    for (const r of team.reactions) {
+      const one = by.get(r.message_id) ?? new Map<string, string[]>();
+      one.set(r.emoji, [...(one.get(r.emoji) ?? []), r.user_id]);
+      by.set(r.message_id, one);
+    }
+    const out = new Map<string, Rx>();
+    for (const [id, one] of by) out.set(id, [...one.entries()].sort((a, b) => EMOJI.indexOf(a[0]) - EMOJI.indexOf(b[0])));
+    return out;
+  }, [team.reactions]);
 
   // @упоминание: подсказки по имени
   const mention = text.match(/(?:^|\s)@([A-Za-zА-Яа-яЁё0-9_-]*)$/)?.[1];
@@ -212,98 +338,35 @@ export default function Chat() {
 
   // реакции: двойной тап — 👍
   const lastTap = useRef<{ id: string; at: number } | null>(null);
-  const onTapMsg = (m: Message) => {
-    const now = Date.now();
-    if (lastTap.current && lastTap.current.id === m.id && now - lastTap.current.at < 320) {
-      lastTap.current = null;
-      tap('success');
-      team.toggleReaction(m.id, '👍', m.userId);
-    } else lastTap.current = { id: m.id, at: now };
-  };
-  const reactionsOf = (id: string) => {
-    const by = new Map<string, string[]>();
-    for (const r of team.reactions) if (r.message_id === id) by.set(r.emoji, [...(by.get(r.emoji) ?? []), r.user_id]);
-    return [...by.entries()].sort((a, b) => EMOJI.indexOf(a[0]) - EMOJI.indexOf(b[0]));
-  };
-  const Reactions = ({ m, me }: { m: Message; me: boolean }) => {
-    const list = reactionsOf(m.id);
-    if (!list.length) return null;
-    return (
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4, alignSelf: me ? 'flex-end' : 'flex-start', marginLeft: me ? 0 : 40 }}>
-        {list.map(([e, users]) => {
-          const mine = users.includes(team.me);
-          return (
-            <Pressable
-              key={e}
-              onPress={() => {
-                tap();
-                team.toggleReaction(m.id, e, m.userId);
-              }}
-              accessibilityLabel={`${e} ${users.length}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, backgroundColor: mine ? t.accent + '33' : t.card2, borderWidth: 1, borderColor: mine ? t.accent : 'transparent' }}
-            >
-              <T v="body" style={{ fontSize: 14 }}>
-                {e}
-              </T>
-              {users.length > 1 ? (
-                <T v="b" style={{ fontSize: 12 }}>
-                  {users.length}
-                </T>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
-    );
-  };
-
-  const renderMsg = ({ item: m }: { item: Message }) => {
-    const me = isMine(m);
-    return (
-      <View style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '86%', marginVertical: 4 }}>
-      <Pressable onPress={() => onTapMsg(m)} onLongPress={() => openMenu(m)} delayLongPress={350}>
-        {me ? (
-          <View>
-          <View style={{ borderRadius: 20, borderTopRightRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 3, overflow: 'hidden', zIndex: 0 }}>
-            <Fill colors={[t.accent2, t.accent, t.accent3]} vertical={false} />
-            {m.quote ? <T v="small" style={{ color: t.onAccent, opacity: 0.75, borderLeftWidth: 3, borderLeftColor: t.onAccent, paddingLeft: 8 }}>{m.quote}</T> : null}
-            {m.photo ? isVoice(m.photo) ? <VoiceBubble path={m.photo} light seed={m.id} /> : <Photo path={m.photo} onOpen={setViewer} /> : null}
-            {m.text ? <Rich text={m.text} color={t.onAccent} accent={t.onAccent} /> : null}
-            <T v="small" style={{ color: t.onAccent, opacity: 0.7, fontSize: 11, alignSelf: 'flex-end' }}>
-              {fmtTime(m)}
-              {kind === 'cloud' ? (readBy(m).length ? '  ✓✓' : '  ✓') : ''}
-            </T>
-          </View>
-          {m.id === lastMine?.id && readBy(m).length ? (
-            <T v="small" style={{ fontSize: 11, alignSelf: 'flex-end', marginTop: 3 }}>
-              Прочитали: {readBy(m).map((r) => nameOf(r.user_id)).filter(Boolean).join(', ')}
-            </T>
-          ) : null}
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
-            <View>
-              <Avatar name={m.author} />
-              {m.userId && team.online.has(m.userId) ? <View style={{ position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, backgroundColor: t.ok, borderWidth: 2, borderColor: t.bg }} /> : null}
-            </View>
-            <Glass radius={20} style={{ borderBottomLeftRadius: 6, paddingHorizontal: 14, paddingVertical: 10, gap: 4, flexShrink: 1 }}>
-              <T v="small" style={{ fontSize: 12 }}>
-                <T v="b" style={{ fontSize: 12, color: t.accent2 }}>
-                  {m.author}
-                </T>
-                {`  ${ROLES[m.role]?.name ?? ''} · ${fmtTime(m)}`}
-              </T>
-              {m.quote ? <T v="small" style={{ borderLeftWidth: 3, borderLeftColor: t.accent, paddingLeft: 8 }}>{m.quote}</T> : null}
-              {m.photo ? isVoice(m.photo) ? <VoiceBubble path={m.photo} seed={m.id} /> : <Photo path={m.photo} onOpen={setViewer} /> : null}
-              {m.text ? <Rich text={m.text} color={t.fg} accent={t.accent2} /> : null}
-            </Glass>
-          </View>
-        )}
-      </Pressable>
-      {Reactions({ m, me })}
-      </View>
-    );
-  };
+  const onTapMsg = useCallback(
+    (m: Message) => {
+      const now = Date.now();
+      if (lastTap.current && lastTap.current.id === m.id && now - lastTap.current.at < 320) {
+        lastTap.current = null;
+        tap('success');
+        toggleReaction(m.id, '👍', m.userId);
+      } else lastTap.current = { id: m.id, at: now };
+    },
+    [tap, toggleReaction],
+  );
+  const onReact = useCallback(
+    (m: Message, e: string) => {
+      tap();
+      toggleReaction(m.id, e, m.userId);
+    },
+    [tap, toggleReaction],
+  );
+  const cloud = kind === 'cloud';
+  const { online, me: myId } = team;
+  const renderMsg = useCallback(
+    ({ item: m }: { item: Message }) => {
+      const me = isMine(m);
+      const rb = me ? readers.filter((r) => r.at >= m.at && r.user_id !== m.userId) : NO_READERS;
+      const readNames = me && m.id === lastMineId ? rb.map((r) => names.get(r.user_id) ?? '').filter(Boolean).join(', ') : '';
+      return <MessageRow m={m} me={me} online={!me && !!m.userId && online.has(m.userId)} read={rb.length > 0} readNames={readNames} reactions={rx.get(m.id)} myId={myId} cloud={cloud} onTap={onTapMsg} onLong={openMenu} onOpen={setViewer} onReact={onReact} />;
+    },
+    [isMine, readers, lastMineId, names, online, rx, myId, cloud, onTapMsg, openMenu, onReact],
+  );
 
   return (
     <Screen compact={kb} right={kind === 'cloud' ? <IconButton icon="phone" label="Звонки" onPress={() => router.push('/team')} /> : undefined} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
@@ -351,19 +414,16 @@ export default function Chat() {
         <FlatList
           data={msgs}
           inverted
-          keyExtractor={(m) => m.id}
+          keyExtractor={keyOf}
           renderItem={renderMsg}
-          contentContainerStyle={{ paddingVertical: 12 }}
+          contentContainerStyle={LIST_PAD}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={{ transform: [{ scaleY: -1 }], padding: 28 }}>
-              <T v="small" style={{ textAlign: 'center' }}>
-                В канале пока тихо. Напишите первое сообщение.
-              </T>
-            </View>
-          }
-          style={{ flex: 1 }}
+          ListEmptyComponent={EmptyChat}
+          initialNumToRender={12}
+          maxToRenderPerBatch={8}
+          windowSize={9}
+          style={styles_flex}
         />
         <View style={{ gap: 6, paddingBottom: kb ? 8 : ins.bottom + 70 }}>
           {editing ? (

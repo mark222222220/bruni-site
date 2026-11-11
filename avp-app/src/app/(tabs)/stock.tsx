@@ -1,15 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
-import { Glass } from '@/components/ui';
+import { Appear, Banner, Bar, Button, Card, CountUp, Empty, Glass, Icon, IconBadge, Pill, Screen, Segmented, Stepper, T, styles } from '@/components/ui';
+import { isLow, needToOrder, useData, useDerived } from '@/lib/data';
+import { fmt, money } from '@/lib/format';
 import { shareLabels } from '@/lib/labels';
+import { useSettings } from '@/lib/settings';
 import { MOVE, signed } from '@/lib/stock';
 import { useTeam, type MoveKind } from '@/lib/team';
-import { Appear, Banner, Bar, Button, Card, CountUp, Empty, Icon, IconBadge, Pill, Screen, Segmented, Stepper, T, styles } from '@/components/ui';
-import { isLow, needToOrder, useData, useDerived } from '@/lib/data';
-import { money } from '@/lib/format';
-import { fmt } from '@/lib/format';
-import { useSettings } from '@/lib/settings';
 
 export default function Stock() {
   const { snap, patch, send, loading, offlineAt } = useData();
@@ -25,6 +23,7 @@ export default function Stock() {
   const groups = ['Все', ...new Set(all.filter((x) => x.status !== 'Нет расхода').map((x) => x.group || 'Прочее'))];
   const qq = q.trim().toLowerCase();
   // при поиске показываем и позиции без расхода
+  const working = all.filter((x) => x.status !== 'Нет расхода');
   const items = all.filter((x) => (qq ? x.name.toLowerCase().includes(qq) : x.status !== 'Нет расхода') && (group === 'Все' || (x.group || 'Прочее') === group));
   const dayStart = new Date(new Date().toDateString()).getTime();
   const todayMoves = moves.filter((m) => m.at >= dayStart);
@@ -50,7 +49,7 @@ export default function Stock() {
   };
 
   return (
-    <Screen kicker="Склад и закупки" title={mode === 'left' ? 'Остатки' : 'Заявка'} subtitle={mode === 'left' ? (sheet ? `${items.length} в работе · склад на ${money(total)} ₽` : `${items.length} материалов`) : sheet ? 'По расходу из таблицы' : 'Собирается сама по минимумам'}>
+    <Screen kicker="Склад и закупки" title={mode === 'left' ? 'Остатки' : 'Заявка'} subtitle={mode === 'left' ? (sheet ? `${working.length} в работе · склад на ${money(total)} ₽` : `${working.length} материалов`) : sheet ? 'По расходу из таблицы' : 'Собирается сама по минимумам'}>
       {canReceive ? (
         <Appear>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -101,8 +100,8 @@ export default function Stock() {
           <View style={{ flex: 1 }}>
             <Card>
               <T v="label">В норме</T>
-              <CountUp value={items.length - low.length} format={(n) => fmt(n)} />
-              <T v="small">из {items.length} позиций</T>
+              <CountUp value={Math.max(0, working.length - low.length)} format={(n) => fmt(n)} />
+              <T v="small">из {working.length} позиций</T>
             </Card>
           </View>
         </View>
@@ -115,6 +114,23 @@ export default function Stock() {
           { value: 'order', label: low.length ? `Заявка · ${low.length}` : 'Заявка' },
         ]}
       />
+      {mode === 'left' ? (
+        <>
+          <Glass radius={18} style={[styles.row, { paddingHorizontal: 16, height: 50 }]}>
+            <Icon name="search" size={18} color={t.mute} />
+            <TextInput value={q} onChangeText={setQ} placeholder="Найти материал" placeholderTextColor={t.mute} returnKeyType="search" clearButtonMode="while-editing" style={{ flex: 1, color: t.fg, fontSize: 16, fontFamily: 'Rubik_400Regular', height: '100%' }} accessibilityLabel="Поиск материала" />
+          </Glass>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: 8, alignItems: 'flex-start' }}>
+            {groups.map((g) => (
+              <Pressable key={g} onPress={() => setGroup(g)} accessibilityRole="button" accessibilityState={{ selected: g === group }} style={{ borderRadius: 16, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: g === group ? t.accent : t.field }}>
+                <T v="b" style={{ fontSize: 13, color: g === group ? t.onAccent : t.fg }}>
+                  {g}
+                </T>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
       {offlineAt ? <Banner tone="bad" text={`Нет связи — данные от ${new Date(offlineAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`} /> : loading ? <Banner text="Загружаю остатки…" /> : null}
       {mode === 'left' ? (
         items.length ? (
@@ -170,7 +186,7 @@ export default function Stock() {
           })
         ) : (
           <Card>
-            <Empty text="Материалов пока нет." />
+            <Empty text={qq || group !== 'Все' ? 'Ничего не нашлось.' : 'Материалов пока нет.'} />
           </Card>
         )
       ) : null}
