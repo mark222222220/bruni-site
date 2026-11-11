@@ -9,6 +9,7 @@ import { Shake } from '@/components/Shake';
 import { Login } from '@/components/Login';
 import { Onboarding } from '@/components/Onboarding';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { CallProvider } from '@/lib/calls';
 import { NotificationsBridge } from '@/lib/notifications';
 import { DataProvider } from '@/lib/data';
 import { SettingsProvider, useSettings } from '@/lib/settings';
@@ -33,6 +34,7 @@ function Root() {
     <Lock>
     <TeamProvider>
     <DataProvider>
+    <CallProvider>
       {auth.required ? <NotificationsBridge /> : null}
       <StatusBar style={t.dark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.bg } }}>
@@ -54,9 +56,12 @@ function Root() {
         <Stack.Screen name="inventory" />
         <Stack.Screen name="stock-log" />
         <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="call" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="team" />
       </Stack>
       <Shake />
       <Confetti />
+    </CallProvider>
     </DataProvider>
     </TeamProvider>
     </Lock>

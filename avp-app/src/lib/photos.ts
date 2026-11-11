@@ -19,6 +19,16 @@ export async function pickPhoto(from: 'camera' | 'library'): Promise<string | nu
   }
 }
 
+/** Несколько фото из галереи за раз (до 6). */
+export async function pickPhotos(limit = 6): Promise<string[]> {
+  try {
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, allowsMultipleSelection: true, selectionLimit: limit, orderedSelection: true });
+    return r.canceled ? [] : r.assets.map((a) => a.uri).slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
 /** Загружает фото в закрытое хранилище и возвращает путь. В демо-режиме — сам файл на телефоне. */
 export async function uploadPhoto(uri: string, folder: 'chat' | 'stock'): Promise<string> {
   return uploadFile(uri, `${folder}/${new Date().toISOString().slice(0, 7)}/${uid()}.jpg`, 'image/jpeg');

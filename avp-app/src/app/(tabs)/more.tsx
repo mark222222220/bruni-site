@@ -58,6 +58,15 @@ export default function More() {
             </View>
           </View>
         </Item>
+        <Item onPress={() => router.push('/team')}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Badge icon="phone" />
+            <View style={{ flex: 1 }}>
+              <T v="b">Звонки</T>
+              <T v="small">Голос и видео коллегам внутри AVP</T>
+            </View>
+          </View>
+        </Item>
         <Item onPress={makePdf}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Badge icon="doc" />

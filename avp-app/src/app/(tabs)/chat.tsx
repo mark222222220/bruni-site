@@ -3,11 +3,11 @@ import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { ActivityIndicator, FlatList, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Avatar, Fill, Glass, Icon, Screen, T, styles } from '@/components/ui';
+import { Avatar, Fill, Glass, Icon, IconButton, Screen, T, styles } from '@/components/ui';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { clock, isVoice, uploadVoice, useVoiceRecorder, VoiceBubble } from '@/components/Voice';
-import { pickPhoto, uploadPhoto, usePhotoUrl } from '@/lib/photos';
+import { pickPhoto, pickPhotos, uploadPhoto, usePhotoUrl } from '@/lib/photos';
 import { useSettings } from '@/lib/settings';
 import { EMOJI, firstName, useTeam } from '@/lib/team';
 import { CHANNELS, ROLES, type Message } from '@/lib/types';
@@ -61,7 +61,9 @@ export default function Chat() {
   const [menu, setMenu] = useState<Message | null>(null);
   const [editing, setEditing] = useState<Message | null>(null);
   const [sure, setSure] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const photo = photos[0] ?? null;
+  const [attachMenu, setAttachMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [viewer, setViewer] = useState<string | null>(null);
@@ -157,8 +159,11 @@ export default function Chat() {
     if (!editing) team.setTyping(v.trim() ? ch : null);
   };
   const attach = async (from: 'camera' | 'library') => {
-    const uri = await pickPhoto(from);
-    if (uri) setPhoto(uri);
+    setAttachMenu(false);
+    // даём меню закрыться — иначе iPhone не откроет галерею поверх него
+    await new Promise((r) => setTimeout(r, 350));
+    const got = from === 'camera' ? [await pickPhoto('camera')].filter((u): u is string => !!u) : await pickPhotos(6 - photos.length);
+    if (got.length) setPhotos((p) => [...p, ...got].slice(0, 6));
   };
 
   const submit = async () => {
@@ -176,11 +181,11 @@ export default function Chat() {
       return;
     }
     setErr('');
-    let path: string | null = null;
-    if (photo) {
+    const paths: string[] = [];
+    if (photos.length) {
       setBusy(true);
       try {
-        path = await uploadPhoto(photo, 'chat');
+        for (const u of photos) paths.push(await uploadPhoto(u, 'chat'));
       } catch (e) {
         setBusy(false);
         setErr(e instanceof Error ? e.message : 'Фото не загрузилось');
@@ -189,13 +194,18 @@ export default function Chat() {
       setBusy(false);
     }
     setText('');
-    setPhoto(null);
+    setPhotos([]);
     team.setTyping(null);
     const q = quote;
     setQuote(null);
-    if (!(await send(ch, v, q, path))) {
-      setText(v);
-      setQuote(q);
+    // несколько фото — несколько сообщений подряд, подпись у первого
+    let ok = await send(ch, v, q, paths[0] ?? null);
+    for (const extra of paths.slice(1)) ok = (await send(ch, '', null, extra)) && ok;
+    if (!ok) {
+      if (!paths.length) {
+        setText(v);
+        setQuote(q);
+      }
       setErr('Не отправилось — проверьте связь');
     } else tap();
   };
@@ -296,7 +306,7 @@ export default function Chat() {
   };
 
   return (
-    <Screen compact={kb} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
+    <Screen compact={kb} right={kind === 'cloud' ? <IconButton icon="phone" label="Звонки" onPress={() => router.push('/team')} /> : undefined} kicker="Команда" title="Чаты" subtitle={kind === 'local' ? 'Демо: сообщения видны только на этом телефоне' : 'Общение команды'} scroll={false}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
@@ -408,15 +418,21 @@ export default function Chat() {
               ))}
             </ScrollView>
           ) : null}
-          {photo ? (
-            <Glass radius={16} style={[styles.row, { padding: 8, gap: 10 }]}>
-              <Image source={{ uri: photo }} style={{ width: 56, height: 56, borderRadius: 10 }} />
-              <T v="small" style={{ flex: 1 }}>
-                {busy ? 'Загружаю фото…' : 'Фото будет отправлено'}
+          {photos.length ? (
+            <Glass radius={16} style={{ padding: 8, gap: 6 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={{ gap: 8 }}>
+                {photos.map((u, i) => (
+                  <View key={u + i}>
+                    <Image source={{ uri: u }} style={{ width: 64, height: 64, borderRadius: 12 }} />
+                    <Pressable onPress={() => setPhotos((p) => p.filter((_, k) => k !== i))} accessibilityLabel="Убрать фото" hitSlop={6} style={{ position: 'absolute', top: -4, right: -4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.75)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon name="close" size={12} color="#fff" stroke={2.6} />
+                    </Pressable>
+                  </View>
+                ))}
+              </ScrollView>
+              <T v="small" style={{ fontSize: 12 }}>
+                {busy ? 'Загружаю фото…' : `Фото: ${photos.length}${photos.length < 6 ? ' · можно добавить ещё' : ''}`}
               </T>
-              <Pressable onPress={() => setPhoto(null)} accessibilityLabel="Убрать фото" hitSlop={8}>
-                <Icon name="close" size={18} color={t.dim} />
-              </Pressable>
             </Glass>
           ) : null}
           {err ? (
@@ -458,8 +474,8 @@ export default function Chat() {
           ) : (
           <Glass radius={26} style={[styles.row, { padding: 6, gap: 8 }]}>
               {editing ? null : (
-                <Pressable onPress={() => attach('camera')} onLongPress={() => attach('library')} accessibilityRole="button" accessibilityLabel="Фото: нажмите — камера, удерживайте — галерея" style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: t.field }}>
-                  <Icon name="camera" size={21} color={t.dim} />
+                <Pressable onPress={() => { Keyboard.dismiss(); setAttachMenu(true); }} accessibilityRole="button" accessibilityLabel="Прикрепить фото" style={{ width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: t.field }}>
+                  <Icon name="plus" size={22} color={t.dim} stroke={2.2} />
                 </Pressable>
               )}
               <TextInput
@@ -566,6 +582,28 @@ export default function Chat() {
                   </T>
                 </Pressable>
               ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+      <Modal visible={attachMenu} transparent animationType="fade" onRequestClose={() => setAttachMenu(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }} onPress={() => setAttachMenu(false)}>
+          <Pressable onPress={() => {}} style={{ backgroundColor: t.premium ? '#141417' : t.dark ? '#1C1C1F' : '#FFFFFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 16, paddingBottom: ins.bottom + 16, gap: 4 }}>
+            {[
+              { key: 'library' as const, label: 'Фото из галереи', sub: 'можно выбрать до 6 сразу', icon: 'image' },
+              { key: 'camera' as const, label: 'Снять на камеру', sub: 'сфотографировать сейчас', icon: 'camera' },
+            ].map((o) => (
+              <Pressable key={o.key} onPress={() => attach(o.key)} accessibilityRole="button" style={({ pressed }) => [styles.row, { gap: 14, paddingHorizontal: 14, paddingVertical: 14, borderRadius: 16, backgroundColor: pressed ? t.line : 'transparent' }]}>
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: t.accent + '22', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={o.icon} size={22} color={t.accent} />
+                </View>
+                <View>
+                  <T v="b" style={{ fontSize: 16 }}>
+                    {o.label}
+                  </T>
+                  <T v="small">{o.sub}</T>
+                </View>
+              </Pressable>
+            ))}
           </Pressable>
         </Pressable>
       </Modal>
